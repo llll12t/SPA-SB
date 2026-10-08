@@ -218,6 +218,13 @@ export async function createAppointmentWithSlotCheck(appointmentData: any, auth?
             updatedAt: FieldValue.serverTimestamp(),
         };
 
+        if ('needsCustomerNotification' in finalAppointmentData) {
+            delete finalAppointmentData.needsCustomerNotification;
+        }
+        if (finalAppointmentData.createdBy && typeof finalAppointmentData.createdBy === 'object') {
+            finalAppointmentData.createdBy = finalAppointmentData.createdBy.adminName || finalAppointmentData.createdBy.adminId || 'admin';
+        }
+
         const newRef = db.collection('appointments').doc();
         await newRef.set(finalAppointmentData);
 

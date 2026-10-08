@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, onAuthStateChanged } from '@/app/lib/supabaseAuth';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, db } from '@/app/lib/supabaseDb';
+import { doc, getDoc, collection, query, orderBy, onSnapshot, db, limit } from '@/app/lib/supabaseDb';
 import AdminNavbar from '@/app/components/AdminNavbar';
 import { useToast } from '@/app/components/Toast';
 import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
@@ -87,7 +87,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         let unsubAuth: any;
         checkAuth().then(unsub => { unsubAuth = unsub; });
 
-        const notifQuery = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+        // Limit to most recent 50 notifications to prevent unbounded query overhead
+        const notifQuery = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50));
         const unsubscribeNotifs = onSnapshot(notifQuery, (querySnapshot) => {
             if (!mounted) return;
             const notifsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
@@ -107,7 +108,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         if (unreadCount > 0) {
             const token = await auth.currentUser?.getIdToken();
             if (!token) {
-                showToast("à¹„à¸¡à¹ˆà¸žà¸šà¸à¸²à¸£à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™", "error");
+                showToast("ไม่พบการยืนยันตัวตน", "error");
                 return;
             }
             const result = await markAllNotificationsAsRead({ adminToken: token });
@@ -126,7 +127,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const handleClearAll = async () => {
         const token = await auth.currentUser?.getIdToken();
         if (!token) {
-            showToast("à¹„à¸¡à¹ˆà¸žà¸šà¸à¸²à¸£à¸¢à¸·à¸™à¸¢à¸±à¸™à¸•à¸±à¸§à¸•à¸™", "error");
+            showToast("ไม่พบการยืนยันตัวตน", "error");
             return;
         }
         const result = await clearAllNotifications({ adminToken: token });
@@ -140,9 +141,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
-                <div className="text-center">
-                    <p>Verifying admin access...</p>
+            <div className="flex items-center justify-center min-h-screen bg-[#faf8f5]">
+                <div className="text-center space-y-2">
+                    <div className="w-8 h-8 border-2 border-[#d7ccc8] border-t-[#5d4037] rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-medium text-[#8d6e63]">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</p>
                 </div>
             </div>
         );
@@ -150,7 +152,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
     if (isAuthorized) {
         return (
-            <div className="min-h-screen bg-[var(--primary-light)] admin-theme">
+            <div className="min-h-screen bg-[#faf8f5] admin-theme text-[#3e2723]">
                 <ConfirmationModal
                     show={showClearConfirm}
                     title="ยืนยันการลบ"
@@ -178,5 +180,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <ProfileProvider>
             <AdminLayoutContent>{children}</AdminLayoutContent>
         </ProfileProvider>
-    )
+    );
 }

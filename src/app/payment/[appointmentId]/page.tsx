@@ -82,87 +82,104 @@ export default function PaymentPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col justify-center items-center h-screen bg-[#FAF9F6]">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-500 font-light">กำลังโหลดข้อมูล...</p>
+            <div className="flex flex-col justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#d7ccc8] border-t-[#5d4037] mx-auto mb-3"></div>
+                <p className="text-[#8d6e63] text-xs font-medium">กำลังโหลดข้อมูลการชำระเงิน...</p>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] p-6 flex items-center justify-center">
-                <div className="bg-white rounded-2xl shadow-sm p-8 text-center max-w-sm w-full">
-                    <div className="text-red-500 mb-4">
-                        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            <div className="py-6">
+                <div className="bg-white rounded-3xl border border-rose-200 p-6 text-center shadow-md space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-xl font-bold">
+                        !
                     </div>
-                    <div className="text-gray-900 text-lg font-semibold mb-2">เกิดข้อผิดพลาด</div>
-                    <p className="text-gray-600 mb-6">{error}</p>
+                    <h3 className="text-base font-bold text-[#3e2723]">เกิดข้อผิดพลาด</h3>
+                    <p className="text-xs text-[#5d4037]">{error}</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-[340px] bg-white rounded-3xl p-6 text-center shadow-sm">
+        <div className="space-y-4">
+            <div className="bg-white rounded-3xl border border-[#e7e0da] shadow-md p-6 text-center space-y-5">
+                {/* Header */}
+                <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold border bg-[#f5f2ed] text-[#5d4037] border-[#d7ccc8]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#5d4037]" />
+                        <span>รอชำระเงิน</span>
+                    </span>
+                    <h1 className="text-base font-bold text-[#3e2723] pt-1">
+                        {appointment?.serviceInfo?.name || 'บริการสปา & นวดเพื่อสุขภาพ'}
+                    </h1>
+                    {appointment?.id && (
+                        <p className="font-mono text-[11px] text-[#8d6e63]">
+                            รหัสนัดหมาย: {appointment.id}
+                        </p>
+                    )}
+                </div>
 
-                {/* Header & Price */}
-                <div className="mb-6">
-                    <h1 className="text-lg font-bold text-gray-900 mb-0.5">ชำระค่าบริการ</h1>
-                    <p className="text-xs text-gray-500 mb-4">{appointment?.serviceInfo?.name}</p>
-
-                    <div className="inline-flex items-baseline justify-center gap-1.5 bg-primary/5 px-5 py-2.5 rounded-2xl">
-                        <span className="text-3xl font-bold text-primary tracking-tight">
-                            {appointment?.paymentInfo?.totalPrice?.toLocaleString()}
-                        </span>
-                        <span className="text-sm font-medium text-gray-500">THB</span>
+                {/* Price Display Box */}
+                <div className="p-4 rounded-2xl bg-[#f5f2ed] border border-[#d7ccc8] space-y-1">
+                    <span className="text-[11px] font-bold text-[#8d6e63] uppercase tracking-wide block">
+                        ยอดที่ต้องชำระสุทธิ
+                    </span>
+                    <div className="text-3xl font-extrabold text-[#3e2723] tabular-nums tracking-tight">
+                        {appointment?.paymentInfo?.totalPrice?.toLocaleString() || '0'}{' '}
+                        <span className="text-base font-bold text-[#5d4037]">บาท</span>
                     </div>
                 </div>
 
                 {/* QR Section */}
-                <div className="mb-4">
+                <div className="space-y-3">
                     {paymentSettings?.method === 'bankinfo' ? (
-                        <div className="bg-gray-50 rounded-xl p-4 text-left">
-                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200/50">
-                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="bg-[#faf8f5] rounded-2xl p-4 text-left border border-[#d7ccc8] space-y-2">
+                            <div className="flex items-center gap-2 pb-2 border-b border-[#e7e0da]">
+                                <svg className="w-4 h-4 text-[#5d4037]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
-                                <span className="font-semibold text-xs text-gray-700">บัญชีธนาคาร</span>
+                                <span className="font-bold text-xs text-[#3e2723]">ข้อมูลบัญชีธนาคารสำหรับโอนเงิน</span>
                             </div>
-                            <pre className="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm">
+                            <pre className="whitespace-pre-wrap font-sans text-[#3e2723] leading-relaxed text-xs">
                                 {paymentSettings.bankInfoText}
                             </pre>
                         </div>
                     ) : qrCodeDataUrl ? (
-                        <div className="flex flex-col items-center">
-                            {/* QR Image - No Border, Just Image */}
-                            <div className="mb-3">
-                                <img src={qrCodeDataUrl} alt="QR Code" className="w-[180px] h-[180px] object-contain mix-blend-multiply" />
+                        <div className="flex flex-col items-center space-y-3">
+                            {/* QR Image Plate */}
+                            <div className="p-3 bg-white rounded-2xl border border-[#d7ccc8] shadow-2xs inline-block">
+                                <img
+                                    src={qrCodeDataUrl}
+                                    alt="QR Code สำหรับชำระเงิน"
+                                    className="w-[190px] h-[190px] object-contain rounded-xl"
+                                />
                             </div>
 
-                            {/* PromptPay Number - Minimal Chip */}
+                            {/* PromptPay Number Badge */}
                             {paymentSettings?.method === 'promptpay' && (
-                                <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-full">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60"></span>
-                                    <span className="text-xs font-mono text-gray-600 tracking-wide">
-                                        {paymentSettings.promptPayAccount}
+                                <div className="inline-flex items-center gap-2 bg-[#f5f2ed] px-3 py-1.5 rounded-xl border border-[#d7ccc8]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#5d4037]" />
+                                    <span className="text-xs font-mono font-bold text-[#3e2723] tabular-nums">
+                                        พร้อมเพย์: {paymentSettings.promptPayAccount}
                                     </span>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl">
-                            <p className="font-semibold">ไม่สามารถสร้าง QR Code ได้</p>
+                        <div className="bg-rose-50 text-rose-700 text-xs p-3.5 rounded-xl border border-rose-200">
+                            <p className="font-semibold">ไม่สามารถสร้าง QR Code สำหรับชำระเงินได้</p>
                         </div>
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="pt-4 border-t border-dashed border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-light">
-                        เมื่อชำระเงินเรียบร้อยแล้ว<br />
-                        <span className="text-gray-500 font-normal">กรุณาส่งสลิปหลักฐานผ่านทาง LINE OA</span>
+                {/* Footer instructions */}
+                <div className="pt-4 border-t border-dashed border-[#e7e0da] text-center">
+                    <p className="text-xs text-[#8d6e63] leading-relaxed">
+                        สแกน QR Code เพื่อชำระเงินตามยอดข้างต้น<br />
+                        <span className="font-semibold text-[#5d4037]">เมื่อชำระแล้ว กรุณาส่งสลิปหลักฐานผ่านทาง LINE OA</span>
                     </p>
                 </div>
             </div>

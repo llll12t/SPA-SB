@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db, doc, getDoc, deleteDoc, onSnapshot } from '@/app/lib/supabaseDb';
 import { auth } from '@/app/lib/supabaseAuth';
@@ -159,6 +159,7 @@ export default function AppointmentDetailPage() {
     const router = useRouter();
     const [appointment, setAppointment] = useState<Appointment | null>(null);
     const [serviceDetails, setServiceDetails] = useState<Service | null>(null);
+    const fetchedServiceIdRef = useRef<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -261,10 +262,13 @@ export default function AppointmentDetailPage() {
 
             setAppointment(appData);
 
-            if (raw.serviceId) {
+            if (raw.serviceId && fetchedServiceIdRef.current !== raw.serviceId) {
                 try {
                     const sSnap = await getDoc(doc(db, 'services', raw.serviceId));
-                    if (sSnap.exists()) setServiceDetails(sSnap.data() as Service);
+                    if (sSnap.exists()) {
+                        setServiceDetails(sSnap.data() as Service);
+                        fetchedServiceIdRef.current = raw.serviceId;
+                    }
                 } catch { }
             }
             setLoading(false);
@@ -279,7 +283,7 @@ export default function AppointmentDetailPage() {
     const dateTime = safeDate(appointment.appointmentInfo?.dateTime || appointment.date);
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4 sm:space-y-5">
             <ConfirmationModal show={showDeleteConfirm} title="ยืนยันการลบการจอง" message="คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลการจองนี้อย่างถาวร?" onConfirm={handleDelete} onCancel={() => setShowDeleteConfirm(false)} isProcessing={deleting} />
             <ConfirmationModal show={!!statusChangeInfo} title="ยืนยันการเปลี่ยนสถานะ" message={`ต้องการปรับปรุงสถานะคิวเป็น "${statusChangeInfo?.statusLabel}" ใช่หรือไม่?`} onConfirm={confirmStatusChange} onCancel={() => setStatusChangeInfo(null)} isProcessing={updating} />
             <CompletionNoteModal open={showCompletionNote} onClose={() => setShowCompletionNote(false)} onSave={handleCompletionWithNote} customerName={appointment.customerInfo?.fullName || appointment.customerInfo?.name || 'ลูกค้า'} serviceInfo={serviceDetails || appointment.serviceInfo} />

@@ -9,60 +9,47 @@ import { useToast } from '@/app/components/Toast';
 import { useProfile } from '@/context/ProfileProvider';
 import { Service } from '@/types';
 
-// --- Icons ---
-const Icons = {
-    Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>,
-    Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-    Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-    Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-    Grid: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
-    List: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>,
-    Clock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    Tag: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-};
-
 // --- SVG Placeholder ---
 const ServiceImagePlaceholder = ({ className = '' }: { className?: string }) => (
-    <div className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#f5ede8] to-[#ede0d4] ${className}`}>
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 mb-1.5 opacity-60">
-            <circle cx="40" cy="30" r="14" stroke="#8D6E63" strokeWidth="2" fill="#fff5f0" />
-            <path d="M40 22 C36 22 33 26 33 30 C33 34 36 38 40 38 C44 38 47 34 47 30 C47 26 44 22 40 22Z" fill="#D7B49E" />
-            <path d="M38 28 L40 26 L42 28 L42 32 L38 32Z" fill="#8D6E63" />
-            <circle cx="40" cy="26" r="2" fill="#5D4037" />
-            <ellipse cx="40" cy="56" rx="20" ry="8" fill="#D7B49E" opacity="0.5" />
-            <path d="M26 50 C26 44 32 40 40 40 C48 40 54 44 54 50" stroke="#8D6E63" strokeWidth="2" fill="none" />
-            <path d="M30 54 Q40 48 50 54" stroke="#A1887F" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-        </svg>
-        <span className="text-[10px] font-medium text-[#A1887F] tracking-wide">ยังไม่มีรูปภาพ</span>
+    <div className={`w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#f5f2ed] to-[#ede0d4] ${className}`}>
+        <span className="text-2xl mb-1 opacity-70">💆</span>
+        <span className="text-[10px] font-semibold text-[#8d6e63] tracking-wide">ยังไม่มีรูปภาพ</span>
     </div>
 );
 
 // --- Helpers ---
-const formatPrice = (v: number | undefined | null) => v == null ? '-' : Number(v).toLocaleString();
+const formatPrice = (v: number | undefined | null) => (v == null ? '-' : Number(v).toLocaleString());
 
-const formatServicePrice = (service: Service, currencySymbol: string) => {
+const formatServicePrice = (service: Service) => {
     if (service.serviceType === 'option-based') {
         const prices = service.serviceOptions?.map(o => Number(o.price)) || [];
-        if (prices.length === 0) return `0 ${currencySymbol}`;
+        if (prices.length === 0) return '0 บาท';
         const min = Math.min(...prices), max = Math.max(...prices);
-        return min === max ? `${formatPrice(min)} ${currencySymbol}` : `${formatPrice(min)} - ${formatPrice(max)} ${currencySymbol}`;
+        return min === max ? `${formatPrice(min)} บาท` : `${formatPrice(min)} - ${formatPrice(max)} บาท`;
     }
     if (service.serviceType === 'area-based-options') {
         const allPrices = service.areaOptions?.flatMap(a => a.options.map(o => Number(o.price))) || [];
-        if (allPrices.length === 0) return `0 ${currencySymbol}`;
+        if (allPrices.length === 0) return '0 บาท';
         const min = Math.min(...allPrices), max = Math.max(...allPrices);
-        return min === max ? `${formatPrice(min)} ${currencySymbol}` : `${formatPrice(min)} - ${formatPrice(max)} ${currencySymbol}`;
+        return min === max ? `${formatPrice(min)} บาท` : `${formatPrice(min)} - ${formatPrice(max)} บาท`;
     }
-    return `${formatPrice(service.price)} ${currencySymbol}`;
+    return `${formatPrice(service.price)} บาท`;
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
-    const config: Record<string, { label: string, bg: string, text: string }> = {
-        available: { label: 'ให้บริการ', bg: 'bg-green-100', text: 'text-green-800' },
-        unavailable: { label: 'งดให้บริการ', bg: 'bg-red-100', text: 'text-red-800' },
-    };
-    const current = config[status] || { label: 'ไม่ระบุ', bg: 'bg-gray-100', text: 'text-gray-700' };
-    return <span className={`px-2 py-1 rounded text-xs font-medium ${current.bg} ${current.text}`}>{current.label}</span>;
+    const isAvailable = status === 'available';
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${
+                isAvailable
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
+                    : 'bg-rose-50 text-rose-700 border-rose-200'
+            }`}
+        >
+            <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+            <span>{isAvailable ? 'ให้บริการ' : 'งดให้บริการ'}</span>
+        </span>
+    );
 };
 
 export default function ServicesListPage() {
@@ -70,6 +57,7 @@ export default function ServicesListPage() {
     const [filteredServices, setFilteredServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'unavailable'>('all');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -85,29 +73,46 @@ export default function ServicesListPage() {
                 const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
                 setAllServices(data);
                 setFilteredServices(data);
-            } catch { showToast("ไม่สามารถโหลดข้อมูลบริการได้", "error"); }
-            finally { setLoading(false); }
+            } catch {
+                showToast('ไม่สามารถโหลดข้อมูลบริการได้', 'error');
+            } finally {
+                setLoading(false);
+            }
         };
         fetchServices();
     }, [showToast]);
 
     useEffect(() => {
-        const lowerSearch = search.toLowerCase();
-        setFilteredServices(allServices.filter(s =>
-            (s.serviceName || s.name || '').toLowerCase().includes(lowerSearch) ||
-            (s.category || '').toLowerCase().includes(lowerSearch)
-        ));
-    }, [search, allServices]);
+        const lowerSearch = search.trim().toLowerCase();
+        let res = allServices;
+
+        if (statusFilter !== 'all') {
+            res = res.filter(s => (s.status || 'available') === statusFilter);
+        }
+
+        if (lowerSearch) {
+            res = res.filter(
+                s =>
+                    (s.serviceName || s.name || '').toLowerCase().includes(lowerSearch) ||
+                    (s.category || '').toLowerCase().includes(lowerSearch) ||
+                    (s.details || s.description || '').toLowerCase().includes(lowerSearch)
+            );
+        }
+
+        setFilteredServices(res);
+    }, [search, statusFilter, allServices]);
 
     const handleUpdateStatus = async (service: Service) => {
         const newStatus = service.status === 'available' ? 'unavailable' : 'available';
         try {
             if (service.id) {
                 await updateDoc(doc(db, 'services', service.id), { status: newStatus });
-                setAllServices(prev => prev.map(s => s.id === service.id ? { ...s, status: newStatus } : s));
-                showToast(`อัพเดทสถานะเป็น "${newStatus === 'available' ? 'ให้บริการ' : 'งดให้บริการ'}" แล้ว`, 'success');
+                setAllServices(prev => prev.map(s => (s.id === service.id ? { ...s, status: newStatus } : s)));
+                showToast(`อัปเดตสถานะเป็น "${newStatus === 'available' ? 'ให้บริการ' : 'งดให้บริการ'}" แล้ว`, 'success');
             }
-        } catch { showToast('เกิดข้อผิดพลาดในการอัพเดทสถานะ', 'error'); }
+        } catch {
+            showToast('เกิดข้อผิดพลาดในการอัปเดตสถานะ', 'error');
+        }
     };
 
     const confirmDelete = async () => {
@@ -117,117 +122,350 @@ export default function ServicesListPage() {
             await deleteDoc(doc(db, 'services', serviceToDelete.id));
             setAllServices(prev => prev.filter(s => s.id !== serviceToDelete.id));
             showToast('ลบข้อมูลบริการสำเร็จ!', 'success');
-        } catch { showToast('เกิดข้อผิดพลาดในการลบข้อมูล', 'error'); }
-        finally { setIsDeleting(false); setServiceToDelete(null); }
+        } catch {
+            showToast('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+        } finally {
+            setIsDeleting(false);
+            setServiceToDelete(null);
+        }
     };
 
-    if (loading) return <div className="flex justify-center items-center min-h-[400px]"><div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div></div>;
+    if (loading && allServices.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[420px] space-y-3">
+                <div className="w-10 h-10 border-2 border-[#d7ccc8] border-t-[#5d4037] rounded-full animate-spin"></div>
+                <p className="text-xs font-medium text-[#8d6e63]">กำลังโหลดรายการบริการ...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-7xl mx-auto p-6">
-            <ConfirmationModal show={!!serviceToDelete} title="ยืนยันการลบ" message={`คุณแน่ใจหรือไม่ว่าต้องการลบบริการ "${serviceToDelete?.serviceName || serviceToDelete?.name}"?`} onConfirm={confirmDelete} onCancel={() => setServiceToDelete(null)} isProcessing={isDeleting} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4 sm:space-y-5">
+            <ConfirmationModal
+                show={!!serviceToDelete}
+                title="ยืนยันการลบบริการ"
+                message={`คุณแน่ใจหรือไม่ว่าต้องการลบบริการ "${serviceToDelete?.serviceName || serviceToDelete?.name}"? การดำเนินการนี้ไม่สามารถย้อนกลับได้`}
+                onConfirm={confirmDelete}
+                onCancel={() => setServiceToDelete(null)}
+                isProcessing={isDeleting}
+            />
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            {/* 1. Frameless Operations Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                 <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">จัดการบริการ</h1>
-                    <p className="text-sm text-gray-500">ตั้งค่าและจัดการรายการบริการทั้งหมด</p>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-bold text-[#3e2723] tracking-tight">
+                            จัดการบริการ
+                        </h1>
+                        <span className="text-[11px] font-semibold text-[#5d4037] bg-[#f5f2ed] px-2 py-0.5 rounded-md border border-[#d7ccc8]/70">
+                            {allServices.length} รายการ
+                        </span>
+                    </div>
+                    <p className="text-xs text-[#8d6e63] mt-0.5">
+                        กำหนดรายการบริการนวดและสปา อัตราค่าบริการ ระยะเวลา และการเปิด/ปิดให้บริการ
+                    </p>
                 </div>
-                <Link href="/services/add" className="flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors btn-primary">
-                    <Icons.Plus /> เพิ่มบริการใหม่
-                </Link>
+
+                <div className="flex items-center gap-2 shrink-0">
+                    {/* View Switcher */}
+                    <div className="inline-flex p-1 bg-white rounded-xl border border-[#d7ccc8] gap-1 shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('grid')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                viewMode === 'grid'
+                                    ? 'bg-[#5d4037] text-white shadow-2xs'
+                                    : 'text-[#5d4037] hover:text-[#3e2723]'
+                            }`}
+                        >
+                            การ์ด
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('table')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                viewMode === 'table'
+                                    ? 'bg-[#5d4037] text-white shadow-2xs'
+                                    : 'text-[#5d4037] hover:text-[#3e2723]'
+                            }`}
+                        >
+                            ตาราง
+                        </button>
+                    </div>
+
+                    {/* Add Button */}
+                    <Link
+                        href="/services/add"
+                        className="h-9 px-3.5 text-xs font-bold rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                    >
+                        <span>+ เพิ่มบริการใหม่</span>
+                    </Link>
+                </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white border border-gray-200 rounded-lg p-4 mb-6">
-                <div className="relative w-full md:w-80">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Icons.Search /></div>
-                    <input type="text" placeholder="ค้นหาชื่อบริการ..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+            {/* 2. Operational Filter Matrix */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#e7e0da] shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Search */}
+                <div className="relative w-full sm:w-80">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8d6e63]">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="ค้นหาชื่อบริการ หรือหมวดหมู่..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="w-full h-9.5 pl-9 pr-8 text-xs sm:text-sm rounded-xl bg-[#faf8f5] border border-[#d7ccc8] focus:bg-white focus:border-[#5d4037] focus:ring-1 focus:ring-[#5d4037] outline-none text-[#3e2723] placeholder:text-[#a1887f] font-medium"
+                    />
+                    {search && (
+                        <button
+                            type="button"
+                            onClick={() => setSearch('')}
+                            className="absolute right-2.5 top-2.5 text-[#8d6e63] hover:text-[#3e2723]"
+                        >
+                            ✕
+                        </button>
+                    )}
                 </div>
-                <div className="flex items-center gap-1 bg-white border rounded-md p-1">
-                    <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}><Icons.Grid /></button>
-                    <button onClick={() => setViewMode('table')} className={`p-2 rounded-md ${viewMode === 'table' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}><Icons.List /></button>
+
+                {/* Status Filter Tabs */}
+                <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+                    {(
+                        [
+                            { key: 'all', label: 'ทั้งหมด' },
+                            { key: 'available', label: 'ให้บริการ' },
+                            { key: 'unavailable', label: 'งดให้บริการ' },
+                        ] as const
+                    ).map(tab => {
+                        const isTabActive = statusFilter === tab.key;
+                        const count =
+                            tab.key === 'all'
+                                ? allServices.length
+                                : allServices.filter(s => (s.status || 'available') === tab.key).length;
+
+                        return (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setStatusFilter(tab.key)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
+                                    isTabActive
+                                        ? 'bg-[#5d4037] text-white shadow-xs'
+                                        : 'bg-[#faf8f5] text-[#5d4037] border border-[#e7e0da] hover:bg-[#f5f2ed]'
+                                }`}
+                            >
+                                <span>{tab.label}</span>
+                                <span
+                                    className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold tabular-nums ${
+                                        isTabActive ? 'bg-white/20 text-white' : 'bg-[#e7e0da] text-[#5d4037]'
+                                    }`}
+                                >
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Content */}
+            {/* 3. Services Content */}
             {filteredServices.length === 0 ? (
-                <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4 text-gray-400"><Icons.Tag /></div>
-                    <p className="text-gray-600 font-medium">ไม่พบข้อมูลบริการ</p>
-                    <p className="text-sm text-gray-400 mt-1">ลองค้นหาใหม่หรือเพิ่มบริการใหม่</p>
+                <div className="text-center py-16 bg-white border border-[#e7e0da] rounded-2xl shadow-2xs space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-[#f5f2ed] border border-[#d7ccc8] text-[#5d4037] flex items-center justify-center mx-auto text-xl shadow-2xs">
+                        💆
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-[#3e2723]">ไม่พบบริการตามเงื่อนไข</h3>
+                        <p className="text-xs text-[#8d6e63] mt-0.5">
+                            ลองเปลี่ยนคำค้นหา หรือเพิ่มรายการบริการใหม่เข้าสู่ระบบ
+                        </p>
+                    </div>
+                    <Link
+                        href="/services/add"
+                        className="inline-flex px-4 py-2 text-xs font-bold rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white shadow-xs transition-colors"
+                    >
+                        + เพิ่มบริการใหม่
+                    </Link>
                 </div>
             ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                /* Luxury Grid View */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {filteredServices.map(service => (
-                        <div key={service.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col">
-                            <div className="relative h-40 w-full bg-[#f5ede8] overflow-hidden">
-                                {service.imageUrl ? (
-                                    <Image src={service.imageUrl} alt={service.serviceName || service.name || 'Service'} fill className="object-cover" unoptimized />
-                                ) : (
-                                    <ServiceImagePlaceholder />
-                                )}
-                                <div className="absolute top-2 right-2"><StatusBadge status={service.status || 'available'} /></div>
-                            </div>
-                            <div className="p-4 flex-1 flex flex-col">
-                                <h3 className="font-medium text-gray-900 mb-1">{service.serviceName || service.name}</h3>
-                                <p className="text-sm text-gray-500 line-clamp-2 mb-3 flex-1">{service.details || service.description || 'ไม่มีรายละเอียด'}</p>
-                                <div className="flex items-center justify-between text-sm mb-3">
-                                    <div className="flex items-center gap-1 text-gray-500">
-                                        <Icons.Clock />
-                                        <span>{['option-based', 'area-based-options'].includes(service.serviceType || '') ? 'ตามตัวเลือก' : `${service.duration} นาที`}</span>
+                        <div
+                            key={service.id}
+                            className="bg-white border border-[#e7e0da] hover:border-[#5d4037] rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
+                        >
+                            <div>
+                                {/* Image Box */}
+                                <div className="relative h-40 w-full bg-[#f5f2ed] overflow-hidden">
+                                    {service.imageUrl ? (
+                                        <Image
+                                            src={service.imageUrl}
+                                            alt={service.serviceName || service.name || 'Service'}
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                            unoptimized
+                                        />
+                                    ) : (
+                                        <ServiceImagePlaceholder />
+                                    )}
+                                    <div className="absolute top-2.5 right-2.5">
+                                        <StatusBadge status={service.status || 'available'} />
                                     </div>
-                                    <span className="font-medium text-gray-900">{formatServicePrice(service, profile?.currencySymbol || '฿')}</span>
                                 </div>
-                                <div className="flex items-center gap-2 pt-3 border-t">
-                                    <button onClick={() => handleUpdateStatus(service)} className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${service.status === 'available' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
-                                        {service.status === 'available' ? 'ปิดบริการ' : 'เปิดบริการ'}
-                                    </button>
-                                    <Link href={`/services/edit/${service.id}`} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md border"><Icons.Edit /></Link>
-                                    <button onClick={() => setServiceToDelete(service)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md border"><Icons.Trash /></button>
+
+                                {/* Body */}
+                                <div className="p-4 space-y-2">
+                                    <h3 className="font-bold text-sm text-[#3e2723] group-hover:text-[#5d4037] transition-colors truncate">
+                                        {service.serviceName || service.name}
+                                    </h3>
+                                    <p className="text-xs text-[#8d6e63] line-clamp-2 min-h-[32px] leading-relaxed">
+                                        {service.details || service.description || 'ไม่มีคำอธิบายเพิ่มเติม'}
+                                    </p>
+
+                                    {/* Price & Duration */}
+                                    <div className="pt-2 border-t border-[#e7e0da] flex items-center justify-between">
+                                        <span className="text-[11px] text-[#8d6e63] flex items-center gap-1 font-medium">
+                                            <svg className="w-3 h-3 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span>
+                                                {['option-based', 'area-based-options'].includes(service.serviceType || '')
+                                                    ? 'ตามตัวเลือก'
+                                                    : `${service.duration} นาที`}
+                                            </span>
+                                        </span>
+                                        <span className="text-sm font-extrabold text-[#3e2723] tabular-nums">
+                                            {formatServicePrice(service)}
+                                        </span>
+                                    </div>
                                 </div>
+                            </div>
+
+                            {/* Actions Bar */}
+                            <div className="p-3 bg-[#faf8f5] border-t border-[#e7e0da] flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(service)}
+                                    className={`flex-1 h-8 rounded-xl text-xs font-bold border transition-colors ${
+                                        service.status === 'available'
+                                            ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    }`}
+                                >
+                                    {service.status === 'available' ? 'ปิดบริการ' : 'เปิดบริการ'}
+                                </button>
+                                <Link
+                                    href={`/services/edit/${service.id}`}
+                                    className="w-8 h-8 rounded-xl border border-[#d7ccc8] bg-white hover:bg-[#f5f2ed] text-[#5d4037] flex items-center justify-center transition-colors"
+                                    title="แก้ไขข้อมูล"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setServiceToDelete(service)}
+                                    className="w-8 h-8 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 flex items-center justify-center transition-colors"
+                                    title="ลบบริการ"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     ))}
                 </div>
             ) : (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">บริการ</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ราคา</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ระยะเวลา</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สถานะ</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {filteredServices.map(service => (
-                                <tr key={service.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative w-10 h-10 rounded-md overflow-hidden bg-[#f5ede8] flex-shrink-0">
-                                                {service.imageUrl ? (
-                                                    <Image src={service.imageUrl} alt={service.serviceName || service.name || 'Service'} fill className="object-cover" unoptimized />
-                                                ) : (
-                                                    <ServiceImagePlaceholder />
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-medium text-gray-900">{service.serviceName || service.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatServicePrice(service, profile?.currencySymbol || '฿')}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{['option-based', 'area-based-options'].includes(service.serviceType || '') ? 'ตามตัวเลือก' : `${service.duration} นาที`}</td>
-                                    <td className="px-6 py-4"><StatusBadge status={service.status || 'available'} /></td>
-                                    <td className="px-6 py-4 text-right">
-                                        <Link href={`/services/edit/${service.id}`} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</Link>
-                                        <button onClick={() => setServiceToDelete(service)} className="text-red-600 hover:underline text-sm">ลบ</button>
-                                    </td>
+                /* High-Density Data Table View */
+                <div className="bg-white rounded-2xl border border-[#e7e0da] overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto w-full">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-[#f5f2ed]/80 text-[#3e2723] font-semibold text-xs border-b border-[#e7e0da]">
+                                <tr>
+                                    <th className="px-4 py-3 border-r border-[#e7e0da]">บริการ</th>
+                                    <th className="px-4 py-3 border-r border-[#e7e0da]">ระยะเวลา</th>
+                                    <th className="px-4 py-3 border-r border-[#e7e0da] text-right">ราคา</th>
+                                    <th className="px-4 py-3 border-r border-[#e7e0da] text-center">สถานะ</th>
+                                    <th className="px-4 py-3 text-right w-40">จัดการ</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-[#e7e0da] text-xs">
+                                {filteredServices.map(service => (
+                                    <tr key={service.id} className="hover:bg-[#faf8f5] transition-colors">
+                                        <td className="px-4 py-3 border-r border-[#e7e0da]">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-[#f5f2ed] border border-[#d7ccc8] shrink-0">
+                                                    {service.imageUrl ? (
+                                                        <Image
+                                                            src={service.imageUrl}
+                                                            alt={service.serviceName || service.name || 'Service'}
+                                                            fill
+                                                            className="object-cover"
+                                                            unoptimized
+                                                        />
+                                                    ) : (
+                                                        <ServiceImagePlaceholder />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-[#3e2723] truncate">
+                                                        {service.serviceName || service.name}
+                                                    </div>
+                                                    <div className="text-[11px] text-[#8d6e63] truncate">
+                                                        {service.category || 'สปาและสุขภาพ'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 border-r border-[#e7e0da] text-[#5d4037] font-medium">
+                                            {['option-based', 'area-based-options'].includes(service.serviceType || '')
+                                                ? 'ตามตัวเลือก'
+                                                : `${service.duration} นาที`}
+                                        </td>
+                                        <td className="px-4 py-3 border-r border-[#e7e0da] text-right font-extrabold text-[#3e2723] tabular-nums">
+                                            {formatServicePrice(service)}
+                                        </td>
+                                        <td className="px-4 py-3 border-r border-[#e7e0da] text-center">
+                                            <StatusBadge status={service.status || 'available'} />
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateStatus(service)}
+                                                    className={`px-2 py-1 text-xs font-bold rounded-lg border transition-colors ${
+                                                        service.status === 'available'
+                                                            ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                    }`}
+                                                >
+                                                    {service.status === 'available' ? 'ปิด' : 'เปิด'}
+                                                </button>
+                                                <Link
+                                                    href={`/services/edit/${service.id}`}
+                                                    className="px-2.5 py-1 text-xs font-bold text-[#5d4037] bg-[#f5f2ed] hover:bg-[#ebdccc] border border-[#d7ccc8] rounded-lg transition-colors"
+                                                >
+                                                    แก้ไข
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setServiceToDelete(service)}
+                                                    className="px-2 py-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors"
+                                                >
+                                                    ลบ
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

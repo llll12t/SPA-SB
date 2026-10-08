@@ -56,37 +56,28 @@
 
 
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #f8f8f8;
-    --foreground: #000000;
-    --card: #1f2937;
-    --border: #374151;
-  }
-}
-
-/* === Admin Theme (Clear + Formal) === */
+/* === Admin Theme (Unified Luxury Mocha & Espresso) === */
 .admin-theme {
-  --primary-light: #f9fafb;
-  --primary: #111827;
-  --primary-dark: #030712;
-  --secondary: #ffffff;
-  --accent: #ffffff;
-  --text: #374151;
-  --text-muted: #6b7280;
-  --subtext: #9ca3af;
-  --border: #e5e7eb;
-  --background: #f0f0f0;
-  --foreground: #242424;
+  --primary-light: #f5f2ed;
+  --primary: #5d4037;
+  --primary-dark: #3e2723;
+  --secondary: #d7ccc8;
+  --accent: #8d6e63;
+  --text: #3e2723;
+  --text-muted: #5d4037;
+  --subtext: #8d6e63;
+  --border: #e7e0da;
+  --background: #faf8f5;
+  --foreground: #3e2723;
   --card: #ffffff;
 
-  /* Button Colors overrides for Admin/Employee */
-  --btn-primary: #111827;
-  --btn-primary-hover: #1f2937;
+  /* Button Colors for Admin */
+  --btn-primary: #5d4037;
+  --btn-primary-hover: #3e2723;
   --btn-secondary: #ffffff;
-  --btn-secondary-hover: #f3f4f6;
-  --btn-danger: #ef4444;
-  --btn-danger-hover: #dc2626;
+  --btn-secondary-hover: #f5f2ed;
+  --btn-danger: #c62828;
+  --btn-danger-hover: #b71c1c;
 }
 
 /* Admin Theme Utility Overrides */
@@ -110,11 +101,6 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border-radius: 40px;
   border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.border {
-  background-color: #ffffff;
-  border: 1px solid #dfdfdf;
 }
 
 .bg-card {
@@ -342,24 +328,4 @@ body {
 .btn-danger:disabled {
   opacity: 0.5 !important;
   cursor: not-allowed !important;
-}
-
-/* Global Shadow Stripper: Disables all shadows and drop-shadow filters globally */
-*,
-.shadow,
-.shadow-sm,
-.shadow-md,
-.shadow-lg,
-.shadow-xl,
-.shadow-2xl,
-.shadow-inner,
-.drop-shadow,
-.drop-shadow-sm,
-.drop-shadow-md,
-.drop-shadow-lg,
-.drop-shadow-xl,
-.drop-shadow-2xl,
-[class*="shadow"] {
-  box-shadow: none !important;
-  filter: none !important;
 }

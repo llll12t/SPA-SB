@@ -183,25 +183,25 @@ function ReviewContent() {
 
     if (liffLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#FAF9F6]">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-500 font-light">กำลังโหลด...</p>
+            <div className="flex flex-col items-center justify-center py-20 space-y-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#d7ccc8] border-t-[#5d4037] mx-auto"></div>
+                <p className="text-[#8d6e63] text-xs font-medium">กำลังโหลดข้อมูลการรีวิว...</p>
             </div>
         );
     }
 
     if (error && !appointment) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] p-6 flex items-center justify-center">
-                <div className="bg-white rounded-2xl shadow-sm p-8 text-center max-w-sm w-full">
-                    <div className="text-red-500 mb-4">
-                        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            <div className="py-6">
+                <div className="bg-white rounded-3xl border border-rose-200 p-6 text-center shadow-md space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-xl font-bold">
+                        !
                     </div>
-                    <div className="text-gray-900 text-lg font-semibold mb-2">เกิดข้อผิดพลาด</div>
-                    <p className="text-gray-600 mb-6">{error}</p>
+                    <h3 className="text-base font-bold text-[#3e2723]">เกิดข้อผิดพลาด</h3>
+                    <p className="text-xs text-[#8d6e63]">{error}</p>
                     <button
                         onClick={handleCancel}
-                        className="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-2xl hover:bg-gray-200 transition-colors font-medium"
+                        className="w-full h-10 bg-[#f5f2ed] hover:bg-[#ebdccc] text-[#5d4037] border border-[#d7ccc8] rounded-xl text-xs font-bold transition-all active:scale-95"
                     >
                         ปิดหน้าต่าง
                     </button>
@@ -212,153 +212,176 @@ function ReviewContent() {
 
     if (success) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] p-6 flex items-center justify-center">
-                <div className="bg-white rounded-2xl shadow-sm p-8 text-center max-w-sm w-full">
-                    <div className="text-6xl mb-6">🎉</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">ขอบคุณสำหรับรีวิว!</h2>
-                    <div className="text-yellow-400 text-2xl mb-4 flex justify-center space-x-1">
-                        {'⭐'.repeat(rating)}
+            <div className="py-6">
+                <div className="bg-white rounded-3xl border border-[#e7e0da] shadow-md p-7 text-center space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-[#f5f2ed] border border-[#d7ccc8] text-[#5d4037] flex items-center justify-center mx-auto text-3xl shadow-2xs">
+                        🎉
                     </div>
-                    <p className="text-gray-600 mb-8 font-light">
-                        ความคิดเห็นของคุณมีค่ามากสำหรับเรา
-                    </p>
-                    <button
-                        onClick={handleCancel}
-                        className="w-full bg-primary text-white px-6 py-3 rounded-2xl hover:bg-primary-dark transition-colors font-medium shadow-sm hover:shadow"
-                    >
-                        ปิดหน้าต่าง
-                    </button>
+                    <div className="space-y-1">
+                        <h2 className="text-xl font-bold text-[#3e2723]">ขอบคุณสำหรับรีวิว!</h2>
+                        <p className="text-xs text-[#8d6e63]">
+                            ความคิดเห็นของคุณมีค่าและช่วยให้เราพัฒนาบริการให้ดียิ่งขึ้น
+                        </p>
+                    </div>
+
+                    <div className="inline-flex items-center gap-1 bg-[#f5f2ed] px-3.5 py-1.5 rounded-full border border-[#d7ccc8] text-amber-500 text-lg">
+                        {'★'.repeat(rating)}
+                    </div>
+
+                    <div className="pt-2">
+                        <button
+                            onClick={handleCancel}
+                            className="w-full h-10 bg-[#5d4037] hover:bg-[#3e2723] text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95"
+                        >
+                            ปิดหน้าต่าง
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] py-8 px-4">
-            <div className="max-w-md mx-auto space-y-6">
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="text-center space-y-1 py-1">
+                <h1 className="text-lg font-bold text-[#3e2723]">ประเมินความพึงพอใจการบริการ</h1>
+                <p className="text-xs text-[#8d6e63]">ความคิดเห็นของคุณช่วยให้เราปรับปรุงคุณภาพบริการให้ดียิ่งขึ้น</p>
+            </div>
 
-                {/* Header */}
-                <div className="text-center mb-6">
-                    <h1 className="text-2xl font-bold text-primary">ให้คะแนนความพึงพอใจ</h1>
-                    <p className="text-gray-500 font-light text-sm mt-1">ช่วยบอกเล่าประสบการณ์ของคุณ</p>
-                </div>
-
-                {/* Appointment Info */}
-                {appointment && (
-                    <div className="bg-white rounded-2xl shadow-sm p-5 border border-gray-50">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="bg-primary/5 p-2 rounded-xl">
-                                <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <h3 className="font-semibold text-gray-800">ข้อมูลการนัดหมาย</h3>
+            {/* Appointment Info Sub-card */}
+            {appointment && (
+                <div className="bg-white rounded-2xl border border-[#e7e0da] shadow-2xs p-4 space-y-2.5">
+                    <div className="flex items-center gap-2 pb-2 border-b border-[#e7e0da]">
+                        <div className="w-6 h-6 rounded-lg bg-[#f5f2ed] text-[#5d4037] flex items-center justify-center text-xs font-bold border border-[#d7ccc8]/60">
+                            📋
                         </div>
-                        <div className="space-y-3 text-sm">
-                            <div className="flex justify-between items-start pb-2 border-b border-gray-50">
-                                <span className="text-gray-500">บริการ</span>
-                                <span className="text-gray-800 font-medium text-right ml-4">{appointment.serviceInfo?.name}</span>
-                            </div>
-                            <div className="flex justify-between items-center pb-2 border-b border-gray-50">
-                                <span className="text-gray-500">ช่างผู้ให้บริการ</span>
-                                <span className="text-gray-800 font-medium">{appointment.appointmentInfo?.technicianInfo?.firstName} {appointment.appointmentInfo?.technicianInfo?.lastName}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-500">วันเวลา</span>
-                                <span className="text-gray-800 font-medium">
-                                    {new Date(appointment.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} • {appointment.time}
-                                </span>
-                            </div>
-                        </div>
+                        <h3 className="font-bold text-xs uppercase tracking-wide text-[#3e2723]">
+                            รายละเอียดการรับบริการ
+                        </h3>
                     </div>
-                )}
 
-                {/* Review Form */}
-                <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-50">
-                    <form onSubmit={handleSubmit} className="space-y-8">
-                        {/* Star Rating */}
-                        <div className="text-center pt-2">
-                            <label className="block text-gray-700 font-medium mb-4">
-                                คุณพึงพอใจกับบริการระดับไหน?
-                            </label>
-                            <StarRating rating={rating} setRating={setRating} />
-                            <p className="text-sm font-medium text-primary mt-3 h-5">
-                                {rating > 0 ? (rating === 5 ? 'ดีเยี่ยม! 🤩' : rating === 4 ? 'ดีมาก 😊' : rating === 3 ? 'ปานกลาง 🙂' : rating === 2 ? 'พอใช้ 😐' : 'ควรปรับปรุง 🙁') : ''}
-                            </p>
+                    <div className="space-y-2 text-xs">
+                        <div className="flex justify-between items-start gap-2">
+                            <span className="text-[#8d6e63]">บริการ</span>
+                            <span className="text-[#3e2723] font-semibold text-right">
+                                {appointment.serviceInfo?.name || '-'}
+                            </span>
                         </div>
-
-                        {/* Comment */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2 pl-1">
-                                เสนอแนะเพิ่มเติม (ไม่บังคับ)
-                            </label>
-                            <textarea
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                className="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-primary/20 text-gray-800 placeholder-gray-400 resize-none transition-all"
-                                rows={4}
-                                placeholder="เช่น การบริการดีมาก, บรรยากาศผ่อนคลาย..."
-                                maxLength={500}
-                            />
-                            <div className="text-right mt-1">
-                                <span className="text-xs text-gray-400">
-                                    {comment.length}/500
+                        {appointment.appointmentInfo?.technicianInfo?.firstName && (
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-[#8d6e63]">ผู้ให้บริการ</span>
+                                <span className="text-[#3e2723] font-medium">
+                                    {appointment.appointmentInfo?.technicianInfo?.firstName} {appointment.appointmentInfo?.technicianInfo?.lastName || ''}
                                 </span>
-                            </div>
-                        </div>
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl text-center">
-                                {error}
                             </div>
                         )}
-
-                        {/* Submit Buttons */}
-                        <div className="space-y-3 pt-2">
-                            <button
-                                type="submit"
-                                disabled={isSubmitting || rating === 0}
-                                className="w-full bg-primary text-white py-4 rounded-2xl font-semibold shadow-sm hover:shadow-md hover:bg-primary-dark disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed transition-all transform active:scale-95"
-                            >
-                                {isSubmitting ? (
-                                    <span className="flex items-center justify-center">
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        กำลังส่งรีวิว...
-                                    </span>
-                                ) : 'ส่งรีวิว'}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleCancel}
-                                className="w-full bg-white text-gray-500 py-3 rounded-2xl font-medium hover:bg-gray-50 border border-gray-100"
-                            >
-                                ยกเลิก
-                            </button>
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-[#8d6e63]">วันเวลาที่นัดหมาย</span>
+                            <span className="text-[#3e2723] font-medium tabular-nums">
+                                {appointment.date ? new Date(appointment.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'} • {appointment.time || '-'}
+                            </span>
                         </div>
-                    </form>
+                    </div>
                 </div>
+            )}
 
-                {/* Info */}
-                <div className="bg-primary/5 rounded-2xl p-4 text-center">
-                    <p className="text-primary text-sm font-medium">
-                        ✨ ทุกความเห็นช่วยให้เราบริการคุณได้ดียิ่งขึ้น
-                    </p>
-                </div>
+            {/* Review Form Card */}
+            <div className="bg-white rounded-3xl border border-[#e7e0da] shadow-md p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Star Rating */}
+                    <div className="text-center space-y-3">
+                        <label className="block text-xs font-bold text-[#3e2723] uppercase tracking-wide">
+                            คุณพึงพอใจกับการบริการระดับใด?
+                        </label>
+                        <StarRating rating={rating} setRating={setRating} />
+                        <div className="h-6 flex items-center justify-center">
+                            {rating > 0 ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-[#f5f2ed] text-[#5d4037] border-[#d7ccc8] animate-in fade-in-50">
+                                    <span>
+                                        {rating === 5 ? 'ดีเยี่ยม! 🤩' : rating === 4 ? 'ดีมาก 😊' : rating === 3 ? 'ปานกลาง 🙂' : rating === 2 ? 'พอใช้ 😐' : 'ควรปรับปรุง 🙁'}
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="text-xs text-[#a1887f]">แตะดาวเพื่อให้คะแนน</span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Comment */}
+                    <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-[#3e2723] uppercase tracking-wide">
+                            ความคิดเห็นหรือข้อเสนอแนะเพิ่มเติม (ไม่บังคับ)
+                        </label>
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="w-full p-3.5 bg-[#faf8f5] border border-[#d7ccc8] rounded-xl focus:bg-white focus:border-[#5d4037] focus:ring-1 focus:ring-[#5d4037] text-xs sm:text-sm text-[#3e2723] placeholder:text-[#a1887f] outline-none transition-all resize-none font-medium"
+                            rows={4}
+                            placeholder="เช่น ช่างบริการดีมาก สุภาพ ผ่อนคลาย สถานที่สะอาด..."
+                            maxLength={500}
+                        />
+                        <div className="text-right">
+                            <span className="text-[11px] text-[#8d6e63] tabular-nums">
+                                {comment.length} / 500
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs font-medium animate-in fade-in-50">
+                            <svg className="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="space-y-2.5 pt-1">
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || rating === 0}
+                            className="w-full h-11 rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
+                                    <span>กำลังส่งรีวิว...</span>
+                                </>
+                            ) : (
+                                <span>ส่งรีวิวการบริการ</span>
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleCancel}
+                            className="w-full h-10 rounded-xl border border-[#d7ccc8] text-[#5d4037] hover:bg-[#f5f2ed] font-semibold text-xs transition-all active:scale-95"
+                        >
+                            ยกเลิก
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Note badge */}
+            <div className="rounded-xl p-3 bg-[#f5f2ed] border border-[#d7ccc8] text-center">
+                <p className="text-xs text-[#5d4037] font-medium">
+                    ✨ ทุกความคิดเห็นจะถูกนำไปพัฒนาคุณภาพและมาตรฐานการบริการให้ดียิ่งขึ้น
+                </p>
             </div>
         </div>
     );
 }
 
-// Main component that wraps ReviewContent with Suspense
 export default function ReviewPage() {
     return (
         <Suspense fallback={
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#FAF9F6]">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-500 font-light">กำลังโหลด...</p>
+            <div className="flex flex-col items-center justify-center py-20 space-y-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#d7ccc8] border-t-[#5d4037] mx-auto"></div>
+                <p className="text-[#8d6e63] text-xs font-medium">กำลังโหลด...</p>
             </div>
         }>
             <ReviewContent />

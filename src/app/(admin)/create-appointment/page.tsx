@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db, collection, getDocs, query, orderBy, where, doc, getDoc } from '@/app/lib/supabaseDb';
 import { auth } from '@/app/lib/supabaseAuth';
 import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
 import { useToast } from '@/app/components/Toast';
 import { createAppointmentWithSlotCheck } from '@/app/actions/appointmentActions';
 import { useProfile } from '@/context/ProfileProvider';
@@ -78,8 +80,6 @@ export default function CreateAppointmentPage() {
     const [existingCustomer, setExistingCustomer] = useState<any>(null);
     const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
     const [timeQueueFull, setTimeQueueFull] = useState(false);
-
-
 
     useEffect(() => {
         const d = searchParams.get('date');
@@ -310,18 +310,15 @@ export default function CreateAppointmentPage() {
         setTriedSubmit(true);
         setValidationError(null);
         if (!selectedService || !appointmentDate || !appointmentTime || !customerInfo.fullName || !customerInfo.phone) {
-            setValidationError('กรุณากรอกข้อมูลให้ครบถ้วน');
+            setValidationError('กรุณากรอกข้อมูลให้ครบถ้วน: บริการ, วันที่, เวลา, ชื่อลูกค้า และเบอร์โทรศัพท์');
             return;
         }
 
         setIsSubmitting(true);
         try {
             const lineUserId = customerInfo.lineUserId?.trim() || null;
-
-            // Construct Data
             const technician = technicians.find(t => t.id === selectedTechnicianId);
 
-            // NOTE: Simplified construction for brevity, ensure matches interface
             const apptData: any = {
                 userId: lineUserId,
                 userInfo: { displayName: customerInfo.fullName },
@@ -349,13 +346,12 @@ export default function CreateAppointmentPage() {
                     paymentStatus: 'pending'
                 },
                 createdAt: new Date(),
-                createdBy: { type: 'admin', adminId: auth.currentUser?.uid || '', adminName: auth.currentUser?.displayName || auth.currentUser?.email || 'Admin' },
-                needsCustomerNotification: true
+                createdBy: auth.currentUser?.displayName || auth.currentUser?.email || 'admin'
             };
 
             const token = await auth.currentUser?.getIdToken();
             if (!token) {
-                setValidationError('ไม่พบการยืนยันตัวตน');
+                setValidationError('ไม่พบการยืนยันตัวตนของผู้ดูแลระบบ');
                 return;
             }
             const res = await createAppointmentWithSlotCheck(apptData, { adminToken: token });
@@ -373,193 +369,506 @@ export default function CreateAppointmentPage() {
         }
     };
 
-    if (loading || profileLoading) return <div className="flex justify-center items-center h-96"><div className="w-8 h-8 rounded-full border-2 border-t-blue-600 animate-spin"></div></div>;
+    if (loading || profileLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[420px] space-y-3">
+                <div className="w-10 h-10 border-2 border-[#d7ccc8] border-t-[#5d4037] rounded-full animate-spin"></div>
+                <p className="text-xs font-medium text-[#8d6e63]">กำลังโหลดข้อมูลฟอร์มนัดหมาย...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-7xl mx-auto p-3 lg:p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-6">
-                {/* 1. Service Selection */}
-                <section className="bg-white border rounded-lg p-5">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="font-semibold text-gray-900">1. เลือกบริการ</h2>
-                        {triedSubmit && !selectedService && <span className="text-xs text-red-600 font-semibold">⚠️ กรุณาเลือกบริการ</span>}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+            {/* 1. Frameless Operations Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/dashboard"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-[#8d6e63] hover:text-[#5d4037] transition-colors"
+                        >
+                            <span>← แดชบอร์ด</span>
+                        </Link>
+                        <span className="text-[#d7ccc8]">/</span>
+                        <h1 className="text-xl sm:text-2xl font-bold text-[#3e2723] tracking-tight">
+                            สร้างการนัดหมายใหม่
+                        </h1>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {services.filter(s => s.status === 'available').map(s => (
-                            <div key={s.id} onClick={() => handleServiceChange(s.id!)}
-                                className={`cursor-pointer border rounded-md p-3 flex gap-3 transition-colors ${selectedServiceId === s.id ? 'bg-gray-50 border-gray-900 ring-1 ring-gray-900' : 'hover:bg-gray-50'}`}>
-                                {s.imageUrl && <img src={s.imageUrl} className="w-12 h-12 rounded object-cover" alt="" />}
-                                <div>
-                                    <div className="font-medium text-sm text-gray-900">{s.serviceName || s.name}</div>
-                                    <div className="text-xs text-gray-500">{s.price ? `${profile?.currencySymbol}${s.price}` : 'ราคาตามตัวเลือก'}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Dynamic Options UI based on Service Type */}
-                    {selectedService?.serviceType === 'option-based' && (
-                        <div className="mt-4 border-t pt-4">
-                            <p className="text-sm font-medium mb-2">เลือกพื้นที่:</p>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {selectedService.selectableAreas?.map((area: string) => (
-                                    <button key={area} type="button"
-                                        onClick={() => setSelectedAreas(prev => prev.includes(area) ? prev.filter(x => x !== area) : [...prev, area])}
-                                        className={`px-3 py-1 rounded border text-sm ${selectedAreas.includes(area) ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-                                        {area}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-sm font-medium mb-2">เลือกแพ็คเกจ:</p>
-                            <div className="space-y-2">
-                                {selectedService.serviceOptions?.map((opt: any, idx: number) => (
-                                    <label key={idx} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
-                                        <input type="radio" checked={selectedOptionIndex === idx} onChange={() => setSelectedOptionIndex(idx)} className="text-gray-900 focus:ring-gray-900" />
-                                        <span className="text-sm">{opt.name} - {opt.duration} นาที ({opt.price} บาท {selectedAreas.length > 1 ? `x ${selectedAreas.length}` : ''})</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    <p className="text-xs text-[#8d6e63] mt-0.5">
+                        ลงคิวนัดหมายล่วงหน้า เลือกบริการ วันเวลา และระบุข้อมูลลูกค้าเพื่อยืนยันการจอง
+                    </p>
+                </div>
 
-                    {selectedService?.serviceType === 'multi-area' && selectedService.areas && (
-                        <div className="mt-4 border-t pt-4">
-                            <p className="text-sm font-medium mb-2">เลือกพื้นที่บริการ:</p>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {selectedService.areas.map((area: any, idx: number) => (
-                                    <button key={idx} type="button"
-                                        onClick={() => { setSelectedAreaIndex(idx); setSelectedPackageIndex(null); }}
-                                        className={`px-3 py-1 rounded border text-sm transition-colors ${selectedAreaIndex === idx ? 'bg-gray-900 text-white border-gray-900' : 'bg-white hover:bg-gray-50'}`}>
-                                        {area.name}
-                                    </button>
-                                ))}
-                            </div>
-                            {selectedAreaIndex !== null && selectedService.areas[selectedAreaIndex]?.packages && (
-                                <>
-                                    <p className="text-sm font-medium mb-2">เลือกแพ็คเกจ:</p>
-                                    <div className="space-y-2">
-                                        {selectedService.areas[selectedAreaIndex].packages.map((pkg: any, idx: number) => (
-                                            <label key={idx} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
-                                                <input type="radio" checked={selectedPackageIndex === idx} onChange={() => setSelectedPackageIndex(idx)} className="text-gray-900 focus:ring-gray-900" />
-                                                <span className="text-sm flex-1">{pkg.name}</span>
-                                                <span className="text-sm text-gray-500">{pkg.duration} นาที | {pkg.price} บาท</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-
-                    {selectedService?.serviceType === 'area-based-options' && selectedService.areaOptions && (
-                        <div className="mt-4 border-t pt-4 space-y-4">
-                            {selectedService.areaOptions.map((areaGroup: any) => (
-                                <div key={areaGroup.areaName}>
-                                    <p className="text-sm font-medium mb-2">{areaGroup.areaName}:</p>
-                                    <div className="space-y-2">
-                                        {areaGroup.options.map((opt: any, idx: number) => (
-                                            <label key={idx} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
-                                                <input type="checkbox"
-                                                    checked={selectedAreaOptions[areaGroup.areaName] === idx}
-                                                    onChange={() => setSelectedAreaOptions(prev => {
-                                                        const next = { ...prev };
-                                                        if (next[areaGroup.areaName] === idx) delete next[areaGroup.areaName];
-                                                        else next[areaGroup.areaName] = idx;
-                                                        return next;
-                                                    })}
-                                                    className="rounded text-gray-900 focus:ring-gray-900"
-                                                />
-                                                <span className="text-sm flex-1">{opt.name}</span>
-                                                <span className="text-sm text-gray-500">{opt.duration} นาที | {opt.price} บาท</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-
-                {/* 2. Date & Time */}
-                <section className="bg-white border rounded-lg p-5">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="font-semibold text-gray-900">2. เลือกวันและเวลา</h2>
-                        {triedSubmit && (!appointmentDate || !appointmentTime) && <span className="text-xs text-red-600 font-semibold">⚠️ กรุณาเลือกวันที่และเวลา</span>}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FullCalendar selectedDate={appointmentDate} onDateSelect={setAppointmentDate} weeklySchedule={bookingSettings.weeklySchedule} holidayDates={bookingSettings.holidayDates} />
-                        <div>
-                            <h3 className="text-sm font-medium mb-3">เวลาที่ว่าง {appointmentDate && `(${format(new Date(appointmentDate), 'dd/MM/yyyy')})`}</h3>
-                            {appointmentDate ?
-                                <TimeSlotGrid timeSlots={availableTimeSlots} selectedTime={appointmentTime} onSelect={setAppointmentTime} />
-                                : <div className="text-gray-400 text-sm text-center py-4">กรุณาเลือกวันที่ก่อน</div>
-                            }
-                        </div>
-                    </div>
-                </section>
-
-                {/* Technicians (Optional) */}
-                {bookingSettings.useTechnician && appointmentTime && (
-                    <section className="bg-white border rounded-lg p-5">
-                        <h2 className="font-semibold text-gray-900 mb-4">เลือกช่าง (ไม่บังคับ)</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {technicians.map(tech => (
-                                <TechnicianCard key={tech.id} technician={tech} isSelected={selectedTechnicianId === tech.id}
-                                    onSelect={(t) => setSelectedTechnicianId(t.id)} isAvailable={!unavailableTechnicianIds.has(tech.id)} />
-                            ))}
-                        </div>
-                    </section>
-                )}
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/dashboard"
+                        className="h-9 px-3.5 text-xs font-bold rounded-xl border border-[#d7ccc8] text-[#5d4037] hover:bg-[#f5f2ed] transition-colors flex items-center"
+                    >
+                        ยกเลิก
+                    </Link>
+                </div>
             </div>
 
-            {/* Right Column: Customer & Summary */}
-            <div className="space-y-6">
-                <section className="bg-white border rounded-lg p-5">
-                    <h2 className="font-semibold text-gray-900 mb-4">ข้อมูลลูกค้า</h2>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="text-xs font-medium text-gray-500">เบอร์โทรศัพท์</label>
-                            <input type="tel" value={customerInfo.phone} onChange={e => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))} className={`w-full border rounded p-2 text-sm ${triedSubmit && !customerInfo.phone ? 'border-red-500 focus:ring-red-500 focus:border-red-500 ring-1 ring-red-500' : 'border-gray-300'}`} placeholder="08x-xxx-xxxx" />
-                            {triedSubmit && !customerInfo.phone && <div className="text-[11px] text-red-600 font-semibold mt-0.5">กรุณากรอกเบอร์โทรศัพท์</div>}
-                            {isCheckingCustomer && <span className="text-xs text-blue-500">กำลังตรวจสอบ...</span>}
+            {/* 2. Main Form Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                {/* Left Column: Service & Booking (8 Cols) */}
+                <div className="lg:col-span-8 space-y-5">
+                    {/* Step 1: Select Service */}
+                    <section className="bg-white border border-[#e7e0da] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-[#e7e0da]">
+                            <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-lg bg-[#f5f2ed] border border-[#d7ccc8] text-[#5d4037] text-xs font-bold flex items-center justify-center">
+                                    1
+                                </span>
+                                <h2 className="font-bold text-sm text-[#3e2723]">เลือกบริการ</h2>
+                            </div>
+                            {triedSubmit && !selectedService && (
+                                <span className="text-xs text-rose-600 font-bold animate-in fade-in-50">
+                                    ⚠️ กรุณาเลือกบริการ
+                                </span>
+                            )}
                         </div>
-                        <div>
-                            <label className="text-xs font-medium text-gray-500">ชื่อ-นามสกุล</label>
-                            <input type="text" value={customerInfo.fullName} onChange={e => setCustomerInfo(prev => ({ ...prev, fullName: e.target.value }))}
-                                className={`w-full border rounded p-2 text-sm ${triedSubmit && !customerInfo.fullName ? 'border-red-500 focus:ring-red-500 focus:border-red-500 ring-1 ring-red-500' : 'border-gray-300'} ${existingCustomer ? 'bg-green-50' : ''}`} placeholder="ชื่อลูกค้า" />
-                            {triedSubmit && !customerInfo.fullName && <div className="text-[11px] text-red-600 font-semibold mt-0.5">กรุณากรอกชื่อ-นามสกุล</div>}
-                        </div>
-                        {existingCustomer && <div className="text-xs text-green-600">✓ พอลูกค้าเดิมในระบบ ({existingCustomer.points || 0} คะแนน)</div>}
-                        <div>
-                            <label className="text-xs font-medium text-gray-500">LINE User ID (Optional)</label>
-                            <input type="text" value={customerInfo.lineUserId} onChange={e => setCustomerInfo(prev => ({ ...prev, lineUserId: e.target.value }))} className="w-full border rounded p-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-gray-500">หมายเหตุ</label>
-                            <textarea value={customerInfo.note} onChange={e => setCustomerInfo(prev => ({ ...prev, note: e.target.value }))} className="w-full border rounded p-2 text-sm" rows={2} />
-                        </div>
-                    </div>
-                </section>
 
-                <section className="bg-gray-50 border rounded-lg p-5">
-                    <h2 className="font-semibold text-gray-900 mb-4">สรุปรายการ</h2>
-                    <div className="space-y-2 text-sm mb-4">
-                        <div className="flex justify-between"><span>บริการ</span><span className="font-medium">{selectedService?.serviceName || '-'}</span></div>
-                        <div className="flex justify-between"><span>ระยะเวลา</span><span>{totalDuration} นาที</span></div>
-                        {selectedAddOns.length > 0 && <div className="flex justify-between text-gray-500"><span>บริการเสริม</span><span>{selectedAddOns.length} รายการ</span></div>}
-                        <div className="border-t pt-2 mt-2 flex justify-between font-bold text-lg">
-                            <span>ยอดสุทธิ</span>
-                            <span>{profile?.currencySymbol}{totalPrice.toLocaleString()}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {services.filter(s => s.status === 'available').map(s => {
+                                const isSelected = selectedServiceId === s.id;
+                                return (
+                                    <div
+                                        key={s.id}
+                                        onClick={() => handleServiceChange(s.id!)}
+                                        className={`cursor-pointer border rounded-xl p-3 flex gap-3 transition-all select-none ${
+                                            isSelected
+                                                ? 'bg-[#f5f2ed] border-[#5d4037] ring-1 ring-[#5d4037] shadow-2xs'
+                                                : 'bg-[#faf8f5] hover:bg-white border-[#e7e0da] hover:border-[#d7ccc8]'
+                                        }`}
+                                    >
+                                        {s.imageUrl ? (
+                                            <img
+                                                src={s.imageUrl}
+                                                className="w-12 h-12 rounded-lg object-cover shrink-0 border border-[#d7ccc8]"
+                                                alt=""
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-lg bg-white border border-[#d7ccc8] flex items-center justify-center text-lg shrink-0">
+                                                💆
+                                            </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-bold text-xs sm:text-sm text-[#3e2723] truncate">
+                                                {s.serviceName || s.name}
+                                            </div>
+                                            <div className="text-xs text-[#5d4037] font-semibold mt-0.5 tabular-nums">
+                                                {s.price ? `${s.price.toLocaleString()} บาท` : 'ราคาตามตัวเลือก'}
+                                            </div>
+                                            {s.duration && (
+                                                <div className="text-[11px] text-[#8d6e63]">
+                                                    ⏱ {s.duration} นาที
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
-                    {validationError && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">
-                            ⚠️ {validationError}
+
+                        {/* Service Options (Dynamic) */}
+                        {selectedService?.serviceType === 'option-based' && (
+                            <div className="mt-4 bg-[#faf8f5] p-3.5 rounded-xl border border-[#e7e0da] space-y-3">
+                                <div>
+                                    <p className="text-xs font-bold text-[#3e2723] uppercase mb-2">เลือกพื้นที่บริการ:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedService.selectableAreas?.map((area: string) => {
+                                            const isAreaSelected = selectedAreas.includes(area);
+                                            return (
+                                                <button
+                                                    key={area}
+                                                    type="button"
+                                                    onClick={() => setSelectedAreas(prev => prev.includes(area) ? prev.filter(x => x !== area) : [...prev, area])}
+                                                    className={`px-3 py-1 rounded-lg border text-xs font-bold transition-colors ${
+                                                        isAreaSelected
+                                                            ? 'bg-[#5d4037] text-white border-[#5d4037]'
+                                                            : 'bg-white border-[#d7ccc8] text-[#5d4037] hover:bg-[#f5f2ed]'
+                                                    }`}
+                                                >
+                                                    {area}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-xs font-bold text-[#3e2723] uppercase mb-2">เลือกแพ็คเกจ:</p>
+                                    <div className="space-y-2">
+                                        {selectedService.serviceOptions?.map((opt: any, idx: number) => (
+                                            <label
+                                                key={idx}
+                                                className={`flex items-center gap-2.5 p-2.5 bg-white border rounded-xl cursor-pointer transition-colors ${
+                                                    selectedOptionIndex === idx
+                                                        ? 'border-[#5d4037] ring-1 ring-[#5d4037]'
+                                                        : 'border-[#e7e0da] hover:border-[#d7ccc8]'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    checked={selectedOptionIndex === idx}
+                                                    onChange={() => setSelectedOptionIndex(idx)}
+                                                    className="accent-[#5d4037]"
+                                                />
+                                                <span className="text-xs font-semibold text-[#3e2723] flex-1">
+                                                    {opt.name} - {opt.duration} นาที
+                                                </span>
+                                                <span className="text-xs font-bold text-[#5d4037] tabular-nums">
+                                                    {opt.price?.toLocaleString()} บาท {selectedAreas.length > 1 ? `x ${selectedAreas.length}` : ''}
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedService?.serviceType === 'multi-area' && selectedService.areas && (
+                            <div className="mt-4 bg-[#faf8f5] p-3.5 rounded-xl border border-[#e7e0da] space-y-3">
+                                <div>
+                                    <p className="text-xs font-bold text-[#3e2723] uppercase mb-2">เลือกพื้นที่บริการ:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedService.areas.map((area: any, idx: number) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => { setSelectedAreaIndex(idx); setSelectedPackageIndex(null); }}
+                                                className={`px-3 py-1 rounded-lg border text-xs font-bold transition-colors ${
+                                                    selectedAreaIndex === idx
+                                                        ? 'bg-[#5d4037] text-white border-[#5d4037]'
+                                                        : 'bg-white border-[#d7ccc8] text-[#5d4037] hover:bg-[#f5f2ed]'
+                                                }`}
+                                            >
+                                                {area.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {selectedAreaIndex !== null && selectedService.areas[selectedAreaIndex]?.packages && (
+                                    <div>
+                                        <p className="text-xs font-bold text-[#3e2723] uppercase mb-2">เลือกแพ็คเกจ:</p>
+                                        <div className="space-y-2">
+                                            {selectedService.areas[selectedAreaIndex].packages.map((pkg: any, idx: number) => (
+                                                <label
+                                                    key={idx}
+                                                    className={`flex items-center gap-2.5 p-2.5 bg-white border rounded-xl cursor-pointer transition-colors ${
+                                                        selectedPackageIndex === idx
+                                                            ? 'border-[#5d4037] ring-1 ring-[#5d4037]'
+                                                            : 'border-[#e7e0da] hover:border-[#d7ccc8]'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        checked={selectedPackageIndex === idx}
+                                                        onChange={() => setSelectedPackageIndex(idx)}
+                                                        className="accent-[#5d4037]"
+                                                    />
+                                                    <span className="text-xs font-semibold text-[#3e2723] flex-1">
+                                                        {pkg.name}
+                                                    </span>
+                                                    <span className="text-xs font-bold text-[#5d4037] tabular-nums">
+                                                        {pkg.duration} นาที | {pkg.price?.toLocaleString()} บาท
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {selectedService?.serviceType === 'area-based-options' && selectedService.areaOptions && (
+                            <div className="mt-4 bg-[#faf8f5] p-3.5 rounded-xl border border-[#e7e0da] space-y-3">
+                                {selectedService.areaOptions.map((areaGroup: any) => (
+                                    <div key={areaGroup.areaName}>
+                                        <p className="text-xs font-bold text-[#3e2723] uppercase mb-2">{areaGroup.areaName}:</p>
+                                        <div className="space-y-2">
+                                            {areaGroup.options.map((opt: any, idx: number) => (
+                                                <label
+                                                    key={idx}
+                                                    className="flex items-center gap-2.5 p-2.5 bg-white border border-[#e7e0da] rounded-xl cursor-pointer hover:border-[#d7ccc8]"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedAreaOptions[areaGroup.areaName] === idx}
+                                                        onChange={() => setSelectedAreaOptions(prev => {
+                                                            const next = { ...prev };
+                                                            if (next[areaGroup.areaName] === idx) delete next[areaGroup.areaName];
+                                                            else next[areaGroup.areaName] = idx;
+                                                            return next;
+                                                        })}
+                                                        className="accent-[#5d4037] rounded"
+                                                    />
+                                                    <span className="text-xs font-semibold text-[#3e2723] flex-1">
+                                                        {opt.name}
+                                                    </span>
+                                                    <span className="text-xs font-bold text-[#5d4037] tabular-nums">
+                                                        {opt.duration} นาที | {opt.price?.toLocaleString()} บาท
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Step 2: Date & Time */}
+                    <section className="bg-white border border-[#e7e0da] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-[#e7e0da]">
+                            <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-lg bg-[#f5f2ed] border border-[#d7ccc8] text-[#5d4037] text-xs font-bold flex items-center justify-center">
+                                    2
+                                </span>
+                                <h2 className="font-bold text-sm text-[#3e2723]">เลือกวันและเวลา</h2>
+                            </div>
+                            {triedSubmit && (!appointmentDate || !appointmentTime) && (
+                                <span className="text-xs text-rose-600 font-bold animate-in fade-in-50">
+                                    ⚠️ กรุณาเลือกทั้งวันที่และเวลา
+                                </span>
+                            )}
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                            {/* Calendar Component */}
+                            <div>
+                                <FullCalendar
+                                    selectedDate={appointmentDate}
+                                    onDateSelect={setAppointmentDate}
+                                    weeklySchedule={bookingSettings.weeklySchedule}
+                                    holidayDates={bookingSettings.holidayDates}
+                                />
+                            </div>
+
+                            {/* Time Slots */}
+                            <div className="bg-[#faf8f5] p-4 rounded-2xl border border-[#e7e0da] space-y-3">
+                                <div>
+                                    <div className="text-[11px] font-bold text-[#8d6e63] uppercase tracking-wider">
+                                        ช่วงเวลาที่ว่าง
+                                    </div>
+                                    <div className="text-xs font-bold text-[#3e2723] mt-0.5">
+                                        {appointmentDate
+                                            ? format(new Date(appointmentDate), 'EEEEที่ d MMMM yyyy', { locale: th })
+                                            : 'กรุณาคลิกเลือกวันที่จากปฏิทิน'}
+                                    </div>
+                                </div>
+
+                                {appointmentDate ? (
+                                    <TimeSlotGrid
+                                        timeSlots={availableTimeSlots}
+                                        selectedTime={appointmentTime}
+                                        onSelect={setAppointmentTime}
+                                    />
+                                ) : (
+                                    <div className="text-center py-8 text-xs text-[#8d6e63]">
+                                        คลิกเลือกวันที่จากปฏิทินด้านซ้ายเพื่อดูช่วงเวลา
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Step 3: Technicians (Optional) */}
+                    {bookingSettings.useTechnician && appointmentTime && (
+                        <section className="bg-white border border-[#e7e0da] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                            <div className="flex items-center gap-2 pb-2 border-b border-[#e7e0da]">
+                                <span className="w-6 h-6 rounded-lg bg-[#f5f2ed] border border-[#d7ccc8] text-[#5d4037] text-xs font-bold flex items-center justify-center">
+                                    3
+                                </span>
+                                <h2 className="font-bold text-sm text-[#3e2723]">เลือกช่างผู้ให้บริการ (ไม่บังคับ)</h2>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {technicians.map(tech => (
+                                    <TechnicianCard
+                                        key={tech.id}
+                                        technician={tech}
+                                        isSelected={selectedTechnicianId === tech.id}
+                                        onSelect={(t) => setSelectedTechnicianId(t.id)}
+                                        isAvailable={!unavailableTechnicianIds.has(tech.id)}
+                                    />
+                                ))}
+                            </div>
+                        </section>
                     )}
-                    <button onClick={handleSubmit} disabled={isSubmitting} className="w-full py-3 rounded-lg font-medium btn-primary">
-                        {isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันการนัดหมาย'}
-                    </button>
-                </section>
+                </div>
+
+                {/* Right Column: Customer Info & Order Summary (4 Cols) */}
+                <div className="lg:col-span-4 space-y-5">
+                    {/* Customer Info Card */}
+                    <section className="bg-white border border-[#e7e0da] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                        <div className="pb-2 border-b border-[#e7e0da]">
+                            <h2 className="font-bold text-sm text-[#3e2723]">ข้อมูลลูกค้า</h2>
+                            <p className="text-[11px] text-[#8d6e63]">ระบุเบอร์โทรเพื่อค้นหาประวัติอัตโนมัติ</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-bold text-[#3e2723] uppercase block mb-1">
+                                    เบอร์โทรศัพท์ <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={customerInfo.phone}
+                                    onChange={e => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
+                                    className={`w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl bg-[#faf8f5] border transition-all outline-none font-medium text-[#3e2723] placeholder:text-[#a1887f] ${
+                                        triedSubmit && !customerInfo.phone
+                                            ? 'border-rose-400 bg-rose-50/20'
+                                            : 'border-[#d7ccc8] focus:bg-white focus:border-[#5d4037] focus:ring-1 focus:ring-[#5d4037]'
+                                    }`}
+                                    placeholder="08x-xxx-xxxx"
+                                />
+                                {triedSubmit && !customerInfo.phone && (
+                                    <div className="text-[10px] text-rose-600 font-bold mt-1">
+                                        กรุณาระบุเบอร์โทรศัพท์
+                                    </div>
+                                )}
+                                {isCheckingCustomer && (
+                                    <span className="text-[11px] text-[#5d4037] font-medium block mt-1">
+                                        กำลังค้นหาประวัติลูกค้า...
+                                    </span>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-[#3e2723] uppercase block mb-1">
+                                    ชื่อ-นามสกุล <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerInfo.fullName}
+                                    onChange={e => setCustomerInfo(prev => ({ ...prev, fullName: e.target.value }))}
+                                    className={`w-full h-10 px-3.5 text-xs sm:text-sm rounded-xl border transition-all outline-none font-medium text-[#3e2723] placeholder:text-[#a1887f] ${
+                                        triedSubmit && !customerInfo.fullName
+                                            ? 'border-rose-400 bg-rose-50/20'
+                                            : existingCustomer
+                                            ? 'bg-emerald-50/40 border-emerald-300'
+                                            : 'bg-[#faf8f5] border-[#d7ccc8] focus:bg-white focus:border-[#5d4037] focus:ring-1 focus:ring-[#5d4037]'
+                                    }`}
+                                    placeholder="ชื่อและนามสกุลลูกค้า"
+                                />
+                                {triedSubmit && !customerInfo.fullName && (
+                                    <div className="text-[10px] text-rose-600 font-bold mt-1">
+                                        กรุณาระบุชื่อลูกค้า
+                                    </div>
+                                )}
+                            </div>
+
+                            {existingCustomer && (
+                                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-1.5">
+                                    <span>✓</span>
+                                    <span>พบข้อมูลลูกค้าในระบบ ({existingCustomer.points || 0} คะแนน)</span>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-xs font-bold text-[#3e2723] uppercase block mb-1">
+                                    LINE User ID (ถ้ามี)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerInfo.lineUserId}
+                                    onChange={e => setCustomerInfo(prev => ({ ...prev, lineUserId: e.target.value }))}
+                                    className="w-full h-10 px-3.5 text-xs rounded-xl bg-[#faf8f5] border border-[#d7ccc8] focus:bg-white focus:border-[#5d4037] outline-none font-mono text-[#3e2723] placeholder:text-[#a1887f]"
+                                    placeholder="U1234567890..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-[#3e2723] uppercase block mb-1">
+                                    หมายเหตุประกอบ
+                                </label>
+                                <textarea
+                                    value={customerInfo.note}
+                                    onChange={e => setCustomerInfo(prev => ({ ...prev, note: e.target.value }))}
+                                    className="w-full p-3 text-xs rounded-xl bg-[#faf8f5] border border-[#d7ccc8] focus:bg-white focus:border-[#5d4037] outline-none text-[#3e2723] resize-none font-medium placeholder:text-[#a1887f]"
+                                    rows={2}
+                                    placeholder="เช่น ลูกค้าแพ้น้ำมันหอมบางชนิด, ขอน้ำหนักมือปานกลาง..."
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Order Summary Card */}
+                    <section className="bg-white border border-[#e7e0da] rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                        <div className="pb-2 border-b border-[#e7e0da]">
+                            <h2 className="font-bold text-sm text-[#3e2723]">สรุปรายละเอียดการจอง</h2>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                            <div className="flex justify-between items-start gap-2">
+                                <span className="text-[#8d6e63]">บริการ</span>
+                                <span className="font-bold text-[#3e2723] text-right truncate">
+                                    {selectedService?.serviceName || '-'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-[#8d6e63]">ระยะเวลา</span>
+                                <span className="font-medium text-[#3e2723] tabular-nums">
+                                    {totalDuration} นาที
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-[#8d6e63]">วันที่นัด</span>
+                                <span className="font-medium text-[#3e2723] tabular-nums">
+                                    {appointmentDate ? format(new Date(appointmentDate), 'd MMM yyyy', { locale: th }) : '-'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-[#8d6e63]">เวลา</span>
+                                <span className="font-medium text-[#3e2723] tabular-nums">
+                                    {appointmentTime ? `${appointmentTime} น.` : '-'}
+                                </span>
+                            </div>
+                            {selectedTechnicianId && (
+                                <div className="flex justify-between items-center gap-2">
+                                    <span className="text-[#8d6e63]">ช่าง</span>
+                                    <span className="font-medium text-[#5d4037]">
+                                        {technicians.find(t => t.id === selectedTechnicianId)?.firstName || '-'}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Price highlight */}
+                            <div className="pt-3 border-t border-[#e7e0da] flex justify-between items-baseline">
+                                <span className="text-xs font-bold text-[#3e2723] uppercase">ยอดสุทธิ</span>
+                                <div className="text-2xl font-extrabold text-[#3e2723] tabular-nums tracking-tight">
+                                    {totalPrice.toLocaleString()}{' '}
+                                    <span className="text-xs font-bold text-[#5d4037]">บาท</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {validationError && (
+                            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-medium animate-in fade-in-50">
+                                ⚠️ {validationError}
+                            </div>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            className="w-full h-11 rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>กำลังบันทึกการนัดหมาย...</span>
+                                </>
+                            ) : (
+                                <span>ยืนยันการนัดหมาย</span>
+                            )}
+                        </button>
+                    </section>
+                </div>
             </div>
         </div>
     );

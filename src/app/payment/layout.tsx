@@ -10,11 +10,11 @@ function PaymentHeader() {
     if (loading) {
         return (
             <div className="p-4">
-                <div className="bg-white shadow-sm rounded-2xl p-4 flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-300 animate-pulse flex-shrink-0"></div>
-                    <div className="flex-grow space-y-2">
-                        <div className="h-3 bg-gray-300 rounded w-1/4 animate-pulse"></div>
-                        <div className="h-4 bg-gray-300 rounded w-3/4 animate-pulse"></div>
+                <div className="bg-white rounded-2xl border border-[#e7e0da] p-3.5 flex items-center gap-3.5 shadow-2xs">
+                    <div className="w-10 h-10 rounded-full bg-[#f5f2ed] animate-pulse shrink-0" />
+                    <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-[#f5f2ed] rounded w-1/4 animate-pulse" />
+                        <div className="h-4 bg-[#f5f2ed] rounded w-1/2 animate-pulse" />
                     </div>
                 </div>
             </div>
@@ -24,49 +24,61 @@ function PaymentHeader() {
     if (error) {
         return (
             <div className="p-4">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
-                    <p className="text-yellow-800 text-sm">⚠️ การเชื่อมต่อ LINE ไม่สมบูรณ์</p>
-                    <p className="text-yellow-700 text-xs mt-1">สามารถใช้งานได้ แต่ไม่สามารถส่งข้อความกลับ LINE ได้</p>
-                    <p className="text-yellow-600 text-xs mt-1">Error: {error}</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-800 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                        <span>⚠️ การเชื่อมต่อ LINE ไม่สมบูรณ์</span>
+                    </div>
+                    <p className="text-amber-700">สามารถใช้งานได้ แต่ไม่สามารถส่งข้อความกลับ LINE ได้</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-4">
-            <header className="bg-gradient-to-r from-green-400 to-green-600 shadow-sm rounded-2xl p-4 flex items-center space-x-4 text-white">
-                {profile?.pictureUrl ? (
-                    <Image
-                        src={profile.pictureUrl}
-                        width={48}
-                        height={48}
-                        alt="Profile"
-                        className="w-12 h-12 rounded-full border-2 border-white"
-                        unoptimized
-                    />
-                ) : null}
-                <div>
-                    <p className="text-green-100 text-sm">ชำระเงิน</p>
-                    <p className="font-semibold text-base">คุณ{profile?.displayName || 'ลูกค้า'}</p>
+        <div className="p-4 pb-2">
+            <header className="bg-white rounded-2xl border border-[#e7e0da] p-3.5 flex items-center justify-between shadow-2xs">
+                <div className="flex items-center gap-3 min-w-0">
+                    {profile?.pictureUrl ? (
+                        <Image
+                            src={profile.pictureUrl}
+                            width={40}
+                            height={40}
+                            alt="Profile"
+                            className="w-10 h-10 rounded-full border border-[#d7ccc8] object-cover shrink-0"
+                            unoptimized
+                        />
+                    ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#f5f2ed] text-[#5d4037] font-bold flex items-center justify-center shrink-0 text-sm border border-[#d7ccc8]/70">
+                            {(profile?.displayName || 'ลูกค้า').charAt(0)}
+                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <div className="text-[11px] font-semibold text-[#8d6e63]">ระบบชำระเงินออนไลน์</div>
+                        <h2 className="font-bold text-sm text-[#3e2723] truncate">คุณ{profile?.displayName || 'ลูกค้า'}</h2>
+                    </div>
                 </div>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border bg-[#f5f2ed] text-[#5d4037] border-[#d7ccc8] shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5d4037] animate-pulse" />
+                    <span>ชำระเงิน</span>
+                </span>
             </header>
         </div>
     );
 }
 
 export default function PaymentLayout({ children }: { children: ReactNode }) {
-    // ใช้ NEXT_PUBLIC_LIFF_ID สำหรับหน้าชำระเงิน
     const paymentLiffId = process.env.NEXT_PUBLIC_LIFF_ID;
-
-    // console.log('Payment LIFF ID:', paymentLiffId); 
 
     if (!paymentLiffId) {
         return (
-            <div className="max-w-md mx-auto bg-gray-100 min-h-screen flex items-center justify-center">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                    <p className="text-red-600">ไม่พบการตั้งค่า LIFF สำหรับการชำระเงิน</p>
-                    <p className="text-red-500 text-sm mt-1">กรุณาติดต่อผู้ดูแลระบบ</p>
+            <div className="max-w-md mx-auto bg-[#faf8f5] min-h-screen flex items-center justify-center p-4">
+                <div className="bg-white border border-rose-200 rounded-2xl p-6 text-center max-w-sm w-full shadow-md space-y-2">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-bold text-lg">
+                        !
+                    </div>
+                    <h3 className="font-bold text-[#3e2723] text-sm">ไม่พบการตั้งค่า LIFF สำหรับการชำระเงิน</h3>
+                    <p className="text-[#8d6e63] text-xs">กรุณาติดต่อผู้ดูแลระบบเพื่อระบุ NEXT_PUBLIC_LIFF_ID ใน .env.local</p>
                 </div>
             </div>
         );
@@ -74,8 +86,9 @@ export default function PaymentLayout({ children }: { children: ReactNode }) {
 
     return (
         <LiffProvider liffId={paymentLiffId}>
-            <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
-                <main className="p-4">
+            <div className="max-w-md mx-auto bg-[#faf8f5] min-h-screen">
+                <PaymentHeader />
+                <main className="p-4 pt-2">
                     {children}
                 </main>
             </div>

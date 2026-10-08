@@ -475,6 +475,76 @@ export async function getDocs<T = any>(queryOrCollection: QueryRef | CollectionR
 // ==============================================================================
 // 8. EXECUTE SET / ADD / UPDATE / DELETE
 // ==============================================================================
+const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
+    appointments: new Set([
+        'id', 'status', 'date', 'time', 'technicianId', 'userId', 'serviceId',
+        'queue', 'queueNumber', 'customerInfo', 'serviceInfo', 'appointmentInfo',
+        'paymentInfo', 'reviewInfo', 'technicianInfo', 'timeline', 'completionNote',
+        'googleCalendarEventId', 'createdBy', 'createdAt', 'updatedAt'
+    ]),
+    services: new Set([
+        'id', 'serviceName', 'name', 'price', 'duration', 'description',
+        'details', 'imageUrl', 'status', 'category', 'serviceType',
+        'serviceOptions', 'areaOptions', 'areas', 'selectableAreas',
+        'addOnServices', 'completionNote', 'createdAt', 'updatedAt'
+    ]),
+    technicians: new Set([
+        'id', 'firstName', 'lastName', 'nickname', 'phoneNumber',
+        'lineUserId', 'imageUrl', 'status', 'createdAt', 'updatedAt'
+    ]),
+    customers: new Set([
+        'id', 'fullName', 'phone', 'phoneNumber', 'email', 'points',
+        'userId', 'imageUrl', 'mergedFromPhone', 'mergedPoints',
+        'mergedAt', 'createdAt', 'updatedAt'
+    ]),
+    customers_by_phone: new Set([
+        'id', 'points', 'fullName', 'mergedToLineId', 'mergedAt',
+        'pointsAfterMerge', 'originalPoints', 'status', 'createdAt', 'updatedAt'
+    ]),
+    rewards: new Set([
+        'id', 'name', 'description', 'pointsRequired', 'discountType',
+        'discountValue', 'value', 'redeemedCount', 'createdAt', 'updatedAt'
+    ]),
+    coupons: new Set([
+        'id', 'customerId', 'rewardId', 'name', 'description',
+        'discountType', 'discountValue', 'used', 'usedAt',
+        'appointmentId', 'expiresAt', 'redeemedAt', 'createdAt'
+    ]),
+    reviews: new Set([
+        'id', 'appointmentId', 'userId', 'technicianId', 'customerName',
+        'rating', 'comment', 'pointsAwarded', 'createdAt'
+    ]),
+    notifications: new Set([
+        'id', 'title', 'message', 'type', 'isRead', 'data', 'createdAt'
+    ]),
+    admins: new Set([
+        'id', 'uid', 'firstName', 'lastName', 'phoneNumber', 'email',
+        'lineUserId', 'role', 'photoURL', 'status', 'createdAt', 'updatedAt'
+    ]),
+    employees: new Set([
+        'id', 'uid', 'firstName', 'lastName', 'phoneNumber', 'email',
+        'lineUserId', 'role', 'photoURL', 'status', 'createdAt', 'updatedAt'
+    ]),
+};
+
+function sanitizeRecordData(table: string, data: any): any {
+    if (!data || typeof data !== 'object') return data;
+    const allowed = TABLE_ALLOWED_COLUMNS[table];
+    if (!allowed) return data;
+
+    const sanitized: any = {};
+    for (const key of Object.keys(data)) {
+        if (allowed.has(key)) {
+            let val = data[key];
+            if (table === 'appointments' && key === 'createdBy' && val && typeof val === 'object') {
+                val = val.adminName || val.adminId || val.type || JSON.stringify(val);
+            }
+            sanitized[key] = val;
+        }
+    }
+    return sanitized;
+}
+
 export async function setDoc(docRef: DocRef, data: any, options?: { merge?: boolean }): Promise<void> {
     const client = getClient();
     const table = docRef.collectionName;
@@ -506,6 +576,7 @@ export async function setDoc(docRef: DocRef, data: any, options?: { merge?: bool
             }
         }
 
+        recordData = sanitizeRecordData(table, recordData);
         const { error } = await client.from(table).upsert(recordData);
         if (error) throw new Error(error.message);
     } catch (err: any) {
@@ -519,7 +590,7 @@ export async function addDoc(collectionRef: CollectionRef, data: any): Promise<{
     const table = collectionRef.collectionName;
     const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `id_${Date.now()}`;
 
-    const recordData = {
+    let recordData = {
         ...data,
         id: data.id || generatedId,
         createdAt: data.createdAt || new Date().toISOString(),
@@ -529,6 +600,7 @@ export async function addDoc(collectionRef: CollectionRef, data: any): Promise<{
         recordData.customerId = collectionRef.customerId;
     }
 
+    recordData = sanitizeRecordData(table, recordData);
     const { error } = await client.from(table).insert(recordData);
     if (error) throw new Error(error.message);
 
@@ -565,7 +637,8 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
             }
         }
 
-        let query = client.from(table).update(updates).eq('id', docRef.id);
+        const cleanUpdates = sanitizeRecordData(table, updates);
+        let query = client.from(table).update(cleanUpdates).eq('id', docRef.id);
         if (docRef.customerId) {
             query = query.eq('customerId', docRef.customerId);
         }

@@ -69,6 +69,15 @@ export async function signInWithEmailAndPassword(
     email: string,
     password: string
 ): Promise<UserCredential> {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+        const err: any = new Error('ยังไม่ได้กำหนด NEXT_PUBLIC_SUPABASE_URL หรือ NEXT_PUBLIC_SUPABASE_ANON_KEY ใน .env.local');
+        err.code = 'auth/missing-env';
+        throw err;
+    }
+
     const client = getSupabaseClient();
     const { data, error } = await client.auth.signInWithPassword({
         email,
@@ -76,12 +85,14 @@ export async function signInWithEmailAndPassword(
     });
 
     if (error) {
-        // Map Supabase error messages to friendly error codes
+        console.error("Supabase signInWithPassword error:", error);
         const err: any = new Error(error.message);
         if (error.message.includes('Invalid login credentials')) {
             err.code = 'auth/invalid-credential';
         } else if (error.message.includes('Email not confirmed')) {
             err.code = 'auth/user-disabled';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            err.code = 'auth/network-request-failed';
         } else {
             err.code = 'auth/internal-error';
         }

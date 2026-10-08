@@ -3,67 +3,125 @@
 import { useState, useEffect } from 'react';
 import { db, doc, getDoc } from '@/app/lib/supabaseDb';
 import { auth } from '@/app/lib/supabaseAuth';
-import { saveProfileSettings, saveNotificationSettings, saveBookingSettings, savePointSettings, savePaymentSettings, saveCalendarSettings } from '@/app/actions/settingsActions';
+import {
+    saveProfileSettings, saveNotificationSettings, saveBookingSettings,
+    savePointSettings, savePaymentSettings, saveCalendarSettings
+} from '@/app/actions/settingsActions';
 import { sendDailyNotificationsNow } from '@/app/actions/dailyNotificationActions';
 import { testAllIndexes, IndexStatus } from '@/app/actions/indexActions';
 import { useToast } from '@/app/components/Toast';
 
 // ============ UI COMPONENTS ============
-const Card = ({ title, children }: { title: string, children: React.ReactNode }) => (
-    <div className="bg-white border border-gray-300 rounded-lg">
-        <div className="px-3.5 py-2 border-b border-gray-300 bg-gray-100 rounded-t-lg">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{title}</h2>
+const SettingCard = ({ title, description, children }: { title: string, description?: string, children: React.ReactNode }) => (
+    <div className="bg-white border border-[#e7e0da] rounded-xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-[#f0eae4] bg-[#faf8f5]">
+            <h2 className="text-sm font-bold text-[#3e2723]">{title}</h2>
+            {description && <p className="text-xs text-stone-500 mt-0.5">{description}</p>}
         </div>
-        <div className="p-3.5 space-y-3">{children}</div>
+        <div className="p-5 space-y-4">{children}</div>
     </div>
 );
 
-const Toggle = ({ label, checked, onChange, disabled }: { label: string, checked?: boolean, onChange: (v: boolean) => void, disabled?: boolean }) => (
-    <div className={`flex items-center justify-between py-1 ${disabled ? 'opacity-40' : ''}`}>
-        {label && <span className="text-sm font-semibold text-gray-800">{label}</span>}
-        <label className="relative inline-flex items-center cursor-pointer">
+const Toggle = ({ label, description, checked, onChange, disabled }: { label: string, description?: string, checked?: boolean, onChange: (v: boolean) => void, disabled?: boolean }) => (
+    <div className={`flex items-center justify-between py-1.5 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div>
+            {label && <span className="text-xs font-semibold text-[#3e2723] block">{label}</span>}
+            {description && <span className="text-[11px] text-stone-500 block">{description}</span>}
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
             <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} className="sr-only peer" disabled={disabled} />
-            <div className="w-9 h-5 bg-gray-300 rounded-full peer peer-checked:bg-black peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+            <div className="w-10 h-5.5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4.5 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all after:shadow-xs peer-checked:bg-[#5d4037]"></div>
         </label>
     </div>
 );
 
-const Input = ({ label, ...props }: any) => (
-    <div className="flex flex-col gap-0.5">
-        {label && <label className="text-xs font-semibold text-gray-700">{label}</label>}
-        <input {...props} className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-1 focus:ring-black focus:border-black bg-white" />
+const Input = ({ label, hint, ...props }: any) => (
+    <div className="space-y-1">
+        {label && <label className="block text-xs font-semibold text-[#3e2723]">{label}</label>}
+        <input
+            {...props}
+            className="w-full px-3 py-2 border border-[#d7ccc8] rounded-lg text-xs sm:text-sm text-[#3e2723] placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#5d4037]/20 focus:border-[#5d4037] bg-white transition-colors"
+        />
+        {hint && <p className="text-[11px] text-stone-500">{hint}</p>}
     </div>
 );
 
-const TextArea = ({ label, ...props }: any) => (
-    <div className="flex flex-col gap-0.5">
-        {label && <label className="text-xs font-semibold text-gray-700">{label}</label>}
-        <textarea {...props} className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-1 focus:ring-black focus:border-black bg-white" />
+const TextArea = ({ label, hint, ...props }: any) => (
+    <div className="space-y-1">
+        {label && <label className="block text-xs font-semibold text-[#3e2723]">{label}</label>}
+        <textarea
+            {...props}
+            className="w-full px-3 py-2 border border-[#d7ccc8] rounded-lg text-xs sm:text-sm text-[#3e2723] placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#5d4037]/20 focus:border-[#5d4037] bg-white transition-colors"
+        />
+        {hint && <p className="text-[11px] text-stone-500">{hint}</p>}
     </div>
 );
 
-const Radio = ({ label, value, selected, onChange }: { label: string, value: string, selected: boolean, onChange: (v: string) => void }) => (
-    <label className={`flex items-center p-2.5 rounded-lg border cursor-pointer text-sm ${selected ? 'border-black bg-gray-50' : 'border-gray-300 hover:bg-gray-50'}`}>
-        <div className={`w-4 h-4 rounded-full border mr-3 flex items-center justify-center ${selected ? 'border-black' : 'border-gray-400'}`}>
-            {selected && <div className="w-2.5 h-2.5 rounded-full bg-black"></div>}
+const Radio = ({ label, description, value, selected, onChange }: { label: string, description?: string, value: string, selected: boolean, onChange: (v: string) => void }) => (
+    <label className={`flex items-start p-3 rounded-xl border cursor-pointer transition-all ${selected ? 'border-[#5d4037] bg-[#faf6f0] shadow-xs' : 'border-[#e7e0da] bg-white hover:bg-[#faf8f5]'}`}>
+        <div className={`w-4 h-4 rounded-full border mt-0.5 mr-3 flex items-center justify-center flex-shrink-0 ${selected ? 'border-[#5d4037]' : 'border-stone-300'}`}>
+            {selected && <div className="w-2 h-2 rounded-full bg-[#5d4037]"></div>}
         </div>
-        <span className="font-semibold text-gray-800">{label}</span>
+        <div>
+            <span className="text-xs font-bold text-[#3e2723] block">{label}</span>
+            {description && <span className="text-[11px] text-stone-500 block mt-0.5">{description}</span>}
+        </div>
         <input type="radio" checked={selected} onChange={() => onChange(value)} className="sr-only" />
     </label>
 );
 
-// ============ MAIN PAGE ============
+// Navigation Tabs
+const SETTING_TABS = [
+    { key: 'profile', label: 'ข้อมูลร้าน' },
+    { key: 'booking', label: 'กฎการจอง & เวลา' },
+    { key: 'payment', label: 'การชำระเงิน' },
+    { key: 'points', label: 'ระบบแต้มสะสม' },
+    { key: 'notifications', label: 'แจ้งเตือน LINE' },
+    { key: 'system', label: 'ระบบ & เชื่อมต่อ' },
+];
+
 export default function SettingsPage() {
+    const [activeTab, setActiveTab] = useState('profile');
     const [settings, setSettings] = useState<any>({
         allNotifications: { enabled: true },
         adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true, customerConfirmed: true },
         customerNotifications: { enabled: true, newBooking: true, appointmentConfirmed: true, serviceCompleted: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true, dailyAppointmentNotification: true },
     });
-    const [bookingSettings, setBookingSettings] = useState<any>({ useTechnician: false, totalTechnicians: 1, bufferMinutes: 0, timeQueues: [], weeklySchedule: {}, holidayDates: [], _queueTime: '', _queueCount: '', _newHolidayDate: '', _newHolidayReason: '' });
-    const [pointSettings, setPointSettings] = useState<any>({ reviewPoints: 5, pointsPerCurrency: 100, pointsPerVisit: 1, enableReviewPoints: true, enablePurchasePoints: false, enableVisitPoints: false });
-    const [paymentSettings, setPaymentSettings] = useState<any>({ method: 'promptpay', promptPayAccount: '', qrCodeImageUrl: '', bankInfoText: '' });
+    const [bookingSettings, setBookingSettings] = useState<any>({
+        useTechnician: false,
+        totalTechnicians: 1,
+        bufferMinutes: 0,
+        timeQueues: [],
+        weeklySchedule: {},
+        holidayDates: [],
+        _queueTime: '',
+        _queueCount: '',
+        _newHolidayDate: '',
+        _newHolidayReason: ''
+    });
+    const [pointSettings, setPointSettings] = useState<any>({
+        reviewPoints: 5,
+        pointsPerCurrency: 100,
+        pointsPerVisit: 1,
+        enableReviewPoints: true,
+        enablePurchasePoints: false,
+        enableVisitPoints: false
+    });
+    const [paymentSettings, setPaymentSettings] = useState<any>({
+        method: 'promptpay',
+        promptPayAccount: '',
+        qrCodeImageUrl: '',
+        bankInfoText: ''
+    });
     const [calendarSettings, setCalendarSettings] = useState<any>({ enabled: false, calendarId: '' });
-    const [profileSettings, setProfileSettings] = useState<any>({ storeName: '', contactPhone: '', address: '', description: '', currency: '฿', currencySymbol: 'บาท' });
+    const [profileSettings, setProfileSettings] = useState<any>({
+        storeName: '',
+        contactPhone: '',
+        address: '',
+        description: '',
+        currency: '฿',
+        currencySymbol: 'บาท'
+    });
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSending, setIsSending] = useState(false);
@@ -74,7 +132,7 @@ export default function SettingsPage() {
     const getAdminToken = async () => {
         const token = await auth.currentUser?.getIdToken();
         if (!token) {
-            showToast("ไม่พบการยืนยันตัวตน", "error");
+            showToast("ไม่พบการยืนยันตัวตนของผู้ดูแลระบบ", "error");
             return null;
         }
         return token;
@@ -103,11 +161,13 @@ export default function SettingsPage() {
                 if (snaps[3].exists()) setPaymentSettings((prev: any) => ({ ...prev, ...snaps[3].data() as any }));
                 if (snaps[4].exists()) setCalendarSettings((prev: any) => ({ ...prev, ...snaps[4].data() as any }));
                 if (snaps[5].exists()) setProfileSettings((prev: any) => ({ ...prev, ...snaps[5].data() as any }));
-            } catch (e) { showToast('โหลดข้อมูลผิดพลาด', 'error'); }
+            } catch {
+                showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลการตั้งค่า', 'error');
+            }
             setLoading(false);
         };
         load();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleNotifChange = (group: string, key: string, value: boolean) => {
         setSettings((prev: any) => {
@@ -149,9 +209,14 @@ export default function SettingsPage() {
                 saveCalendarSettings(cleanCalendar, { adminToken: token })
             ]);
 
-            if (results.every(r => r.success)) showToast('บันทึกสำเร็จ', 'success');
-            else throw new Error('บันทึกบางส่วนไม่สำเร็จ');
-        } catch (e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+            if (results.every(r => r.success)) {
+                showToast('บันทึกการตั้งค่าทั้งหมดเรียบร้อยแล้ว', 'success');
+            } else {
+                throw new Error('บันทึกบางส่วนไม่สำเร็จ');
+            }
+        } catch {
+            showToast('เกิดข้อผิดพลาดในการบันทึกการตั้งค่า', 'error');
+        }
         setIsSaving(false);
     };
 
@@ -164,9 +229,11 @@ export default function SettingsPage() {
                 return;
             }
             const result = await sendDailyNotificationsNow(isMock, { adminToken: token });
-            if (result.success) showToast(isMock ? 'ทดสอบสำเร็จ' : 'ส่งสำเร็จ', 'success');
+            if (result.success) showToast(isMock ? 'ทดสอบการส่งสำเร็จ' : 'ส่งแจ้งเตือนจริงสำเร็จ', 'success');
             else throw new Error(result.error);
-        } catch (e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+        } catch (e: any) {
+            showToast('เกิดข้อผิดพลาด: ' + (e?.message || ''), 'error');
+        }
         setIsSending(false);
     };
 
@@ -180,227 +247,557 @@ export default function SettingsPage() {
             }
             const result = await testAllIndexes({ adminToken: token });
             setIndexResults(result);
-            showToast(result.missingCount === 0 ? 'Indexes พร้อมใช้งาน' : `พบ ${result.missingCount} Indexes ที่ต้องสร้าง`, result.missingCount === 0 ? 'success' : 'warning');
-        } catch (e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+            showToast(result.missingCount === 0 ? 'Indexes ทั้งหมดพร้อมใช้งาน' : `พบ ${result.missingCount} Indexes ที่ต้องสร้างเพิ่ม`, result.missingCount === 0 ? 'success' : 'warning');
+        } catch {
+            showToast('เกิดข้อผิดพลาดในการตรวจสอบ Indexes', 'error');
+        }
         setIsCheckingIndexes(false);
     };
 
     const addTimeQueue = () => {
         if (!bookingSettings._queueTime || !bookingSettings._queueCount) return;
-        setBookingSettings((prev: any) => ({ ...prev, timeQueues: [...(prev.timeQueues || []), { time: prev._queueTime, count: parseInt(prev._queueCount) }].sort((a: any, b: any) => a.time.localeCompare(b.time)), _queueTime: '', _queueCount: '' }));
+        setBookingSettings((prev: any) => ({
+            ...prev,
+            timeQueues: [...(prev.timeQueues || []), { time: prev._queueTime, count: parseInt(prev._queueCount) }].sort((a: any, b: any) => a.time.localeCompare(b.time)),
+            _queueTime: '',
+            _queueCount: ''
+        }));
     };
 
     const addHoliday = () => {
         if (!bookingSettings._newHolidayDate) return;
-        setBookingSettings((prev: any) => ({ ...prev, holidayDates: [...(prev.holidayDates || []), { date: prev._newHolidayDate, reason: prev._newHolidayReason }].sort((a: any, b: any) => a.date.localeCompare(b.date)), _newHolidayDate: '', _newHolidayReason: '' }));
+        setBookingSettings((prev: any) => ({
+            ...prev,
+            holidayDates: [...(prev.holidayDates || []), { date: prev._newHolidayDate, reason: prev._newHolidayReason }].sort((a: any, b: any) => a.date.localeCompare(b.date)),
+            _newHolidayDate: '',
+            _newHolidayReason: ''
+        }));
     };
 
-    if (loading) return <div className="flex justify-center items-center min-h-[400px]"><div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div></div>;
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[420px] space-y-3">
+                <div className="w-10 h-10 border-2 border-[#d7ccc8] border-t-[#5d4037] rounded-full animate-spin"></div>
+                <p className="text-xs font-medium text-[#8d6e63]">กำลังโหลดการตั้งค่าระบบ...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-7xl mx-auto p-4">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4 sm:space-y-5">
+            {/* 1. Frameless Operations Header (UI_DESIGN_SYSTEM Rule 1.5 & 5.1) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-lg font-bold text-gray-900">ตั้งค่าระบบ</h1>
-                    <p className="text-xs text-gray-500">จัดการการตั้งค่าทั้งหมดของร้าน</p>
+                    <div className="inline-flex items-center gap-1.5 text-xs text-[#8d6e63] font-medium mb-1">
+                        <span>ระบบจัดการสปา</span>
+                        <span>/</span>
+                        <span>กำหนดค่าระบบ</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-xl sm:text-2xl font-bold text-[#3e2723]">ตั้งค่าระบบและการทำงาน</h1>
+                    </div>
                 </div>
-                <button onClick={handleSave} disabled={isSaving} className="px-5 py-2 text-sm font-semibold rounded-lg btn-primary">
-                    {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-white bg-[#5d4037] hover:bg-[#3e2723] shadow-sm hover:shadow transition-all disabled:opacity-50"
+                    >
+                        <span>{isSaving ? 'กำลังบันทึก...' : '💾 บันทึกการตั้งค่าทั้งหมด'}</span>
+                    </button>
+                </div>
             </div>
 
-            {/* Cards Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {/* 2. Settings Category Navigation Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-[#e7e0da]">
+                {SETTING_TABS.map(tab => {
+                    const active = activeTab === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                                active
+                                    ? 'bg-[#5d4037] text-white shadow-2xs'
+                                    : 'text-[#8d6e63] hover:text-[#3e2723] hover:bg-[#efebe9]'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    );
+                })}
+            </div>
 
-                {/* ข้อมูลร้าน */}
-                <Card title="ข้อมูลร้าน">
-                    <Input label="ชื่อร้าน" value={profileSettings.storeName} onChange={(e: any) => setProfileSettings({ ...profileSettings, storeName: e.target.value })} />
-                    <Input label="เบอร์โทรติดต่อ" type="tel" value={profileSettings.contactPhone} onChange={(e: any) => setProfileSettings({ ...profileSettings, contactPhone: e.target.value })} />
-                    <TextArea label="ที่อยู่" rows={2} value={profileSettings.address} onChange={(e: any) => setProfileSettings({ ...profileSettings, address: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-2">
-                        <Input label="หน่วยเงิน (ย่อ)" value={profileSettings.currency} onChange={(e: any) => setProfileSettings({ ...profileSettings, currency: e.target.value })} placeholder="฿" />
-                        <Input label="หน่วยเงิน (เต็ม)" value={profileSettings.currencySymbol} onChange={(e: any) => setProfileSettings({ ...profileSettings, currencySymbol: e.target.value })} placeholder="บาท" />
+            {/* 3. Tab Contents */}
+            <div className="space-y-4">
+                {/* TAB 1: ข้อมูลร้าน */}
+                {activeTab === 'profile' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SettingCard title="ข้อมูลทั่วไปของร้าน" description="ข้อมูลติดต่อที่จะแสดงให้ลูกค้าเห็นในใบเสร็จและการจอง">
+                            <Input
+                                label="ชื่อร้าน / ธุรกิจ"
+                                value={profileSettings.storeName}
+                                onChange={(e: any) => setProfileSettings({ ...profileSettings, storeName: e.target.value })}
+                                placeholder="เช่น The Oasis Spa & Wellness"
+                            />
+                            <Input
+                                label="เบอร์โทรศัพท์ติดต่อร้าน"
+                                type="tel"
+                                value={profileSettings.contactPhone}
+                                onChange={(e: any) => setProfileSettings({ ...profileSettings, contactPhone: e.target.value })}
+                                placeholder="02-xxx-xxxx หรือ 08x-xxx-xxxx"
+                            />
+                            <TextArea
+                                label="ที่อยู่ร้าน / สาขา"
+                                rows={3}
+                                value={profileSettings.address}
+                                onChange={(e: any) => setProfileSettings({ ...profileSettings, address: e.target.value })}
+                                placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์"
+                            />
+                        </SettingCard>
+
+                        <SettingCard title="สกุลเงินและรูปแบบราคา" description="กำหนดสัญลักษณ์ทางการเงินสำหรับระบบ">
+                            <div className="grid grid-cols-2 gap-3">
+                                <Input
+                                    label="หน่วยเงิน (สัญลักษณ์)"
+                                    value={profileSettings.currency}
+                                    onChange={(e: any) => setProfileSettings({ ...profileSettings, currency: e.target.value })}
+                                    placeholder="฿"
+                                />
+                                <Input
+                                    label="ชื่อหน่วยเงิน (ข้อความ)"
+                                    value={profileSettings.currencySymbol}
+                                    onChange={(e: any) => setProfileSettings({ ...profileSettings, currencySymbol: e.target.value })}
+                                    placeholder="บาท"
+                                />
+                            </div>
+                            <div className="p-3 bg-[#faf8f5] rounded-xl border border-[#f0eae4] text-xs text-stone-600 mt-2">
+                                <span className="font-semibold text-[#3e2723]">ตัวอย่างการแสดงผล:</span> 1,200 {profileSettings.currencySymbol || 'บาท'} ({profileSettings.currency || '฿'})
+                            </div>
+                        </SettingCard>
                     </div>
-                </Card>
+                )}
 
-                {/* โหมดการจอง */}
-                <Card title="โหมดการจอง">
-                    <Toggle label="โหมดเลือกช่าง" checked={bookingSettings.useTechnician} onChange={v => setBookingSettings((p: any) => ({ ...p, useTechnician: v }))} />
-                    <Input label={bookingSettings.useTechnician ? 'จำนวนช่างทั้งหมด' : 'จำนวนคิวสูงสุด'} type="number" value={bookingSettings.totalTechnicians} onChange={(e: any) => setBookingSettings((p: any) => ({ ...p, totalTechnicians: parseInt(e.target.value) || 1 }))} />
-                    <Input label="Buffer (นาที) ระหว่างคิว" type="number" value={bookingSettings.bufferMinutes} onChange={(e: any) => setBookingSettings((p: any) => ({ ...p, bufferMinutes: Number(e.target.value) }))} />
+                {/* TAB 2: กฎการจอง & เวลา */}
+                {activeTab === 'booking' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SettingCard title="โหมดการจองและการรับคิว" description="กำหนดเงื่อนไขว่าลูกค้าสามารถเลือกช่างได้หรือไม่">
+                            <div className="p-3 bg-[#faf8f5] rounded-xl border border-[#f0eae4] mb-3">
+                                <Toggle
+                                    label="โหมดระบุช่างผู้ให้บริการ (Technician Mode)"
+                                    description="เมื่อเปิดใช้งาน ลูกค้าจะสามารถเลือกช่างเฉพาะได้"
+                                    checked={bookingSettings.useTechnician}
+                                    onChange={v => setBookingSettings((p: any) => ({ ...p, useTechnician: v }))}
+                                />
+                            </div>
 
-                    <div className="pt-2 border-t border-gray-300">
-                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">กำหนดคิวตามเวลา</label>
-                        <div className="flex gap-1.5">
-                            <input type="time" value={bookingSettings._queueTime} onChange={e => setBookingSettings((p: any) => ({ ...p, _queueTime: e.target.value }))} className="flex-1 px-2.5 py-1 border border-gray-300 rounded-lg text-sm text-gray-900" />
-                            <input type="number" value={bookingSettings._queueCount} onChange={e => setBookingSettings((p: any) => ({ ...p, _queueCount: e.target.value }))} placeholder="จำนวน" className="w-16 px-2.5 py-1 border border-gray-300 rounded-lg text-sm text-gray-900" />
-                            <button onClick={addTimeQueue} disabled={!bookingSettings._queueTime || !bookingSettings._queueCount} className="px-4 py-1.5 text-sm font-semibold rounded-lg btn-primary">+</button>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                            {(bookingSettings.timeQueues || []).map((q: any) => (
-                                <span key={q.time} className="inline-flex items-center gap-1 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-lg text-[11px] text-gray-800">
-                                    {q.time} ({q.count}) <button onClick={() => setBookingSettings((p: any) => ({ ...p, timeQueues: p.timeQueues.filter((x: any) => x.time !== q.time) }))} className="text-gray-400 hover:text-gray-650">×</button>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                </Card>
+                            <Input
+                                label={bookingSettings.useTechnician ? 'จำนวนช่างทั้งหมดในระบบ' : 'จำนวนคิวพร้อมกันสูงสุด'}
+                                type="number"
+                                min="1"
+                                value={bookingSettings.totalTechnicians}
+                                onChange={(e: any) => setBookingSettings((p: any) => ({ ...p, totalTechnicians: parseInt(e.target.value) || 1 }))}
+                            />
 
-                {/* เวลาทำการ */}
-                <Card title="เวลาทำการ">
-                    {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((name, idx) => {
-                        const day = bookingSettings.weeklySchedule?.[idx] || { isOpen: false, openTime: '09:00', closeTime: '18:00' };
-                        return (
-                            <div key={idx} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
-                                <div className="flex items-center gap-2">
-                                    <Toggle label="" checked={day.isOpen} onChange={v => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, isOpen: v } } }))} />
-                                    <span className={`text-xs font-bold w-6 ${day.isOpen ? 'text-gray-900' : 'text-gray-400'}`}>{name}</span>
+                            <Input
+                                label="เวลาพักเบรก (Buffer) ระหว่างคิว (นาที)"
+                                type="number"
+                                min="0"
+                                value={bookingSettings.bufferMinutes}
+                                onChange={(e: any) => setBookingSettings((p: any) => ({ ...p, bufferMinutes: Number(e.target.value) }))}
+                                hint="เวลาเตรียมห้องหรืออุปกรณ์ก่อนเริ่มคิวถัดไป"
+                            />
+
+                            <div className="pt-3 border-t border-[#f0eae4]">
+                                <label className="block text-xs font-semibold text-[#3e2723] mb-1.5">กำหนดจำนวนคิวเฉพาะตามช่วงเวลา</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="time"
+                                        value={bookingSettings._queueTime}
+                                        onChange={e => setBookingSettings((p: any) => ({ ...p, _queueTime: e.target.value }))}
+                                        className="flex-1 px-3 py-1.5 border border-[#d7ccc8] rounded-lg text-xs"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="จำนวน"
+                                        value={bookingSettings._queueCount}
+                                        onChange={e => setBookingSettings((p: any) => ({ ...p, _queueCount: e.target.value }))}
+                                        className="w-20 px-3 py-1.5 border border-[#d7ccc8] rounded-lg text-xs font-mono"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addTimeQueue}
+                                        disabled={!bookingSettings._queueTime || !bookingSettings._queueCount}
+                                        className="px-3 py-1.5 text-xs font-bold text-white bg-[#5d4037] hover:bg-[#3e2723] rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        + เพิ่ม
+                                    </button>
                                 </div>
-                                {day.isOpen && (
-                                    <div className="flex items-center gap-1">
-                                        <input type="time" value={day.openTime} onChange={e => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, openTime: e.target.value } } }))} className="px-1.5 py-0.5 border border-gray-300 rounded-lg text-sm w-28 text-gray-900" />
-                                        <span className="text-gray-400 text-xs">-</span>
-                                        <input type="time" value={day.closeTime} onChange={e => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, closeTime: e.target.value } } }))} className="px-1.5 py-0.5 border border-gray-300 rounded-lg text-sm w-28 text-gray-900" />
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {(bookingSettings.timeQueues || []).map((q: any) => (
+                                        <span key={q.time} className="inline-flex items-center gap-1.5 bg-[#faf6f0] border border-[#e7e0da] px-2 py-0.5 rounded-lg text-xs text-[#5d4037] font-mono">
+                                            {q.time} ({q.count} คิว)
+                                            <button
+                                                type="button"
+                                                onClick={() => setBookingSettings((p: any) => ({ ...p, timeQueues: p.timeQueues.filter((x: any) => x.time !== q.time) }))}
+                                                className="text-stone-400 hover:text-rose-600 font-bold"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </SettingCard>
+
+                        <div className="space-y-4">
+                            <SettingCard title="เวลาทำการประจำสัปดาห์" description="เปิด/ปิดการรับคิวในแต่ละวันและกำหนดเวลาเปิด-ปิด">
+                                {["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"].map((name, idx) => {
+                                    const day = bookingSettings.weeklySchedule?.[idx] || { isOpen: false, openTime: '09:00', closeTime: '18:00' };
+                                    return (
+                                        <div key={idx} className="flex items-center justify-between py-1.5 border-b border-[#f0eae4] last:border-b-0 text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <Toggle
+                                                    label=""
+                                                    checked={day.isOpen}
+                                                    onChange={v => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, isOpen: v } } }))}
+                                                />
+                                                <span className={`font-bold w-16 ${day.isOpen ? 'text-[#3e2723]' : 'text-stone-400'}`}>{name}</span>
+                                            </div>
+                                            {day.isOpen ? (
+                                                <div className="flex items-center gap-1 font-mono">
+                                                    <input
+                                                        type="time"
+                                                        value={day.openTime}
+                                                        onChange={e => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, openTime: e.target.value } } }))}
+                                                        className="px-2 py-1 border border-[#d7ccc8] rounded-md text-xs"
+                                                    />
+                                                    <span className="text-stone-400">-</span>
+                                                    <input
+                                                        type="time"
+                                                        value={day.closeTime}
+                                                        onChange={e => setBookingSettings((p: any) => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [idx]: { ...day, closeTime: e.target.value } } }))}
+                                                        className="px-2 py-1 border border-[#d7ccc8] rounded-md text-xs"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <span className="text-stone-400 text-xs">ปิดทำการ</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </SettingCard>
+
+                            <SettingCard title="วันหยุดพิเศษและวันหยุดนักขัตฤกษ์" description="ปิดรับคิวในวันที่กำหนดเป็นกรณีพิเศษ">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="date"
+                                        value={bookingSettings._newHolidayDate}
+                                        onChange={e => setBookingSettings((p: any) => ({ ...p, _newHolidayDate: e.target.value }))}
+                                        className="px-3 py-1.5 border border-[#d7ccc8] rounded-lg text-xs"
+                                        min={new Date().toISOString().split('T')[0]}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="สาเหตุ (เช่น วันสงกรานต์)"
+                                        value={bookingSettings._newHolidayReason || ''}
+                                        onChange={e => setBookingSettings((p: any) => ({ ...p, _newHolidayReason: e.target.value }))}
+                                        className="flex-1 px-3 py-1.5 border border-[#d7ccc8] rounded-lg text-xs"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addHoliday}
+                                        disabled={!bookingSettings._newHolidayDate}
+                                        className="px-3 py-1.5 text-xs font-bold text-white bg-[#5d4037] hover:bg-[#3e2723] rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        + เพิ่มวันหยุด
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {(bookingSettings.holidayDates || []).map((h: any) => (
+                                        <span key={h.date} className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-lg text-xs">
+                                            <span className="font-mono">{h.date}</span> {h.reason && `(${h.reason})`}
+                                            <button
+                                                type="button"
+                                                onClick={() => setBookingSettings((p: any) => ({ ...p, holidayDates: p.holidayDates.filter((x: any) => x.date !== h.date) }))}
+                                                className="text-rose-400 hover:text-rose-700 font-bold"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </SettingCard>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB 3: การชำระเงิน */}
+                {activeTab === 'payment' && (
+                    <div className="max-w-2xl">
+                        <SettingCard title="ช่องทางการรับชำระเงิน" description="ตั้งค่าวิธีการรับโอนหรือสแกนจ่ายเงินของลูกค้า">
+                            <div className="space-y-2">
+                                <Radio
+                                    label="พร้อมเพย์ (PromptPay QR)"
+                                    description="สร้าง QR Code อัตโนมัติด้วยเบอร์โทรหรือเลขบัตรประจำตัว"
+                                    value="promptpay"
+                                    selected={paymentSettings.method === 'promptpay'}
+                                    onChange={v => setPaymentSettings({ ...paymentSettings, method: v })}
+                                />
+                                <Radio
+                                    label="รูปภาพ QR Code สแตนบาย"
+                                    description="อัปโหลดภาพ QR Code ธนาคารหรือสแกนรับเงินที่มีอยู่แล้ว"
+                                    value="image"
+                                    selected={paymentSettings.method === 'image'}
+                                    onChange={v => setPaymentSettings({ ...paymentSettings, method: v })}
+                                />
+                                <Radio
+                                    label="ข้อมูลเลขที่บัญชีธนาคาร"
+                                    description="แสดงเลขบัญชีและชื่อธนาคารเพื่อให้ลูกค้าโอนเงิน"
+                                    value="bankinfo"
+                                    selected={paymentSettings.method === 'bankinfo'}
+                                    onChange={v => setPaymentSettings({ ...paymentSettings, method: v })}
+                                />
+                            </div>
+
+                            <div className="pt-3 border-t border-[#f0eae4] mt-3">
+                                {paymentSettings.method === 'promptpay' && (
+                                    <Input
+                                        label="หมายเลขพร้อมเพย์ (เบอร์โทร 10 หลัก หรือเลขบัตร 13 หลัก)"
+                                        value={paymentSettings.promptPayAccount}
+                                        onChange={(e: any) => setPaymentSettings({ ...paymentSettings, promptPayAccount: e.target.value })}
+                                        placeholder="0812345678"
+                                    />
+                                )}
+
+                                {paymentSettings.method === 'image' && (
+                                    <div className="space-y-3">
+                                        <Input
+                                            label="URL ลิงก์รูปภาพ QR Code"
+                                            value={paymentSettings.qrCodeImageUrl}
+                                            onChange={(e: any) => setPaymentSettings({ ...paymentSettings, qrCodeImageUrl: e.target.value })}
+                                            placeholder="https://example.com/qr.png"
+                                        />
+                                        {paymentSettings.qrCodeImageUrl && (
+                                            <div className="p-2 border border-[#d7ccc8] rounded-xl bg-[#faf8f5] w-fit">
+                                                <img src={paymentSettings.qrCodeImageUrl} alt="QR Code Preview" className="w-28 h-28 object-contain rounded" />
+                                            </div>
+                                        )}
                                     </div>
                                 )}
+
+                                {paymentSettings.method === 'bankinfo' && (
+                                    <TextArea
+                                        label="รายละเอียดบัญชีธนาคาร"
+                                        rows={4}
+                                        value={paymentSettings.bankInfoText}
+                                        onChange={(e: any) => setPaymentSettings({ ...paymentSettings, bankInfoText: e.target.value })}
+                                        placeholder="ธนาคารกสิกรไทย&#10;เลขที่บัญชี: 123-4-56789-0&#10;ชื่อบัญชี: บจก. สปา แอนด์ เวลเนส"
+                                    />
+                                )}
                             </div>
-                        );
-                    })}
-                </Card>
-
-                {/* วันหยุด */}
-                <Card title="วันหยุดพิเศษ">
-                    <div className="flex gap-1.5">
-                        <input type="date" value={bookingSettings._newHolidayDate} onChange={e => setBookingSettings((p: any) => ({ ...p, _newHolidayDate: e.target.value }))} className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900" min={new Date().toISOString().split('T')[0]} />
-                        <input type="text" value={bookingSettings._newHolidayReason || ''} onChange={e => setBookingSettings((p: any) => ({ ...p, _newHolidayReason: e.target.value }))} placeholder="สาเหตุ" className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900" />
-                        <button onClick={addHoliday} disabled={!bookingSettings._newHolidayDate} className="px-4 py-1.5 text-sm font-semibold rounded-lg btn-danger">+</button>
+                        </SettingCard>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                        {(bookingSettings.holidayDates || []).map((h: any) => (
-                            <span key={h.date} className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-100 px-2 py-0.5 rounded-lg text-[11px]">
-                                {h.date} {h.reason && `(${h.reason})`}
-                                <button onClick={() => setBookingSettings((p: any) => ({ ...p, holidayDates: p.holidayDates.filter((x: any) => x.date !== h.date) }))} className="text-red-450 hover:text-red-650">×</button>
-                            </span>
-                        ))}
-                    </div>
-                </Card>
+                )}
 
-                {/* การชำระเงิน */}
-                <Card title="การชำระเงิน">
-                    <div className="space-y-1.5">
-                        <Radio label="PromptPay" value="promptpay" selected={paymentSettings.method === 'promptpay'} onChange={v => setPaymentSettings({ ...paymentSettings, method: v })} />
-                        <Radio label="รูปภาพ QR Code" value="image" selected={paymentSettings.method === 'image'} onChange={v => setPaymentSettings({ ...paymentSettings, method: v })} />
-                        <Radio label="ข้อมูลบัญชีธนาคาร" value="bankinfo" selected={paymentSettings.method === 'bankinfo'} onChange={v => setPaymentSettings({ ...paymentSettings, method: v })} />
-                    </div>
-                    {paymentSettings.method === 'promptpay' && <Input label="เบอร์ PromptPay" value={paymentSettings.promptPayAccount} onChange={(e: any) => setPaymentSettings({ ...paymentSettings, promptPayAccount: e.target.value })} placeholder="0812345678" />}
-                    {paymentSettings.method === 'image' && (
-                        <>
-                            <Input label="URL รูปภาพ QR" value={paymentSettings.qrCodeImageUrl} onChange={(e: any) => setPaymentSettings({ ...paymentSettings, qrCodeImageUrl: e.target.value })} />
-                            {paymentSettings.qrCodeImageUrl && <img src={paymentSettings.qrCodeImageUrl} alt="QR" className="w-20 h-20 border border-gray-300 rounded object-cover mt-1" />}
-                        </>
-                    )}
-                    {paymentSettings.method === 'bankinfo' && <TextArea label="ข้อมูลบัญชี" rows={3} value={paymentSettings.bankInfoText} onChange={(e: any) => setPaymentSettings({ ...paymentSettings, bankInfoText: e.target.value })} />}
-                </Card>
+                {/* TAB 4: ระบบแต้มสะสม */}
+                {activeTab === 'points' && (
+                    <div className="max-w-2xl">
+                        <SettingCard title="ระบบสะสมแต้มสมาชิก (Loyalty Points)" description="ตั้งค่าเงื่อนไขการแจกแต้มเพื่อให้ลูกค้านำไปแลกของรางวัล">
+                            <div className="space-y-3">
+                                <div className="p-3 bg-[#faf8f5] rounded-xl border border-[#f0eae4]">
+                                    <Toggle
+                                        label="ให้แต้มเมื่อลูกค้าเขียนรีวิว"
+                                        description="มอบแต้มสะสมให้ลูกค้าทันทีหลังส่งรีวิวความพึงพอใจ"
+                                        checked={pointSettings.enableReviewPoints}
+                                        onChange={v => setPointSettings((p: any) => ({ ...p, enableReviewPoints: v }))}
+                                    />
+                                    {pointSettings.enableReviewPoints && (
+                                        <div className="mt-2 pt-2 border-t border-[#e7e0da]">
+                                            <Input
+                                                label="จำนวนแต้มที่มอบให้ต่อการรีวิว 1 ครั้ง"
+                                                type="number"
+                                                value={pointSettings.reviewPoints}
+                                                onChange={(e: any) => setPointSettings((p: any) => ({ ...p, reviewPoints: parseInt(e.target.value) || 5 }))}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
-                {/* ระบบพ้อยต์ */}
-                <Card title="ระบบสะสมพ้อยต์">
-                    <div className="space-y-2">
-                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-300">
-                            <Toggle label="ให้พ้อยต์หลังรีวิว" checked={pointSettings.enableReviewPoints} onChange={v => setPointSettings((p: any) => ({ ...p, enableReviewPoints: v }))} />
-                            {pointSettings.enableReviewPoints && <div className="mt-1.5 pt-1.5 border-t border-gray-200"><Input label="พ้อยต์ที่ได้" type="number" value={pointSettings.reviewPoints} onChange={(e: any) => setPointSettings((p: any) => ({ ...p, reviewPoints: parseInt(e.target.value) || 5 }))} /></div>}
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-300">
-                            <Toggle label="ให้พ้อยต์ตามยอดซื้อ" checked={pointSettings.enablePurchasePoints} onChange={v => setPointSettings((p: any) => ({ ...p, enablePurchasePoints: v }))} />
-                            {pointSettings.enablePurchasePoints && <div className="mt-1.5 pt-1.5 border-t border-gray-200"><Input label={`ยอดซื้อกี่ ${profileSettings.currencySymbol || 'บาท'} ต่อ 1 พ้อยต์`} type="number" value={pointSettings.pointsPerCurrency} onChange={(e: any) => setPointSettings((p: any) => ({ ...p, pointsPerCurrency: parseInt(e.target.value) || 100 }))} /></div>}
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-300">
-                            <Toggle label="ให้พ้อยต์ต่อครั้งที่มา" checked={pointSettings.enableVisitPoints} onChange={v => setPointSettings((p: any) => ({ ...p, enableVisitPoints: v }))} />
-                            {pointSettings.enableVisitPoints && <div className="mt-1.5 pt-1.5 border-t border-gray-200"><Input label="พ้อยต์ที่ได้" type="number" value={pointSettings.pointsPerVisit} onChange={(e: any) => setPointSettings((p: any) => ({ ...p, pointsPerVisit: parseInt(e.target.value) || 1 }))} /></div>}
-                        </div>
-                    </div>
-                </Card>
+                                <div className="p-3 bg-[#faf8f5] rounded-xl border border-[#f0eae4]">
+                                    <Toggle
+                                        label="ให้แต้มตามยอดชำระเงิน"
+                                        description="คำนวณแต้มสะสมตามจำนวนเงินที่ลูกค้าชำระจริง"
+                                        checked={pointSettings.enablePurchasePoints}
+                                        onChange={v => setPointSettings((p: any) => ({ ...p, enablePurchasePoints: v }))}
+                                    />
+                                    {pointSettings.enablePurchasePoints && (
+                                        <div className="mt-2 pt-2 border-t border-[#e7e0da]">
+                                            <Input
+                                                label={`ยอดใช้จ่ายกี่ ${profileSettings.currencySymbol || 'บาท'} ต่อ 1 แต้ม`}
+                                                type="number"
+                                                value={pointSettings.pointsPerCurrency}
+                                                onChange={(e: any) => setPointSettings((p: any) => ({ ...p, pointsPerCurrency: parseInt(e.target.value) || 100 }))}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
-                {/* แจ้งเตือน Admin */}
-                <Card title="แจ้งเตือน LINE - Admin">
-                    <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-200 mb-2">
-                        <Toggle label="เปิดการแจ้งเตือนทั้งหมด" checked={settings.allNotifications.enabled} onChange={v => handleNotifChange('allNotifications', 'enabled', v)} />
-                    </div>
-                    <Toggle label="เปิดแจ้งเตือน Admin" checked={settings.adminNotifications.enabled} onChange={v => handleNotifChange('adminNotifications', 'enabled', v)} disabled={!settings.allNotifications.enabled} />
-                    {settings.adminNotifications.enabled && (
-                        <div className="pl-3 border-l-2 border-gray-300 space-y-1 mt-1">
-                            <Toggle label="เมื่อมีการจองใหม่" checked={settings.adminNotifications.newBooking} onChange={v => handleNotifChange('adminNotifications', 'newBooking', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อลูกค้ายืนยัน" checked={settings.adminNotifications.customerConfirmed} onChange={v => handleNotifChange('adminNotifications', 'customerConfirmed', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อมีการยกเลิก" checked={settings.adminNotifications.bookingCancelled} onChange={v => handleNotifChange('adminNotifications', 'bookingCancelled', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อมีการชำระเงิน" checked={settings.adminNotifications.paymentReceived} onChange={v => handleNotifChange('adminNotifications', 'paymentReceived', v)} disabled={!settings.allNotifications.enabled} />
-                        </div>
-                    )}
-                </Card>
-
-                {/* แจ้งเตือนลูกค้า */}
-                <Card title="แจ้งเตือน LINE - ลูกค้า">
-                    <Toggle label="เปิดแจ้งเตือนลูกค้า" checked={settings.customerNotifications.enabled} onChange={v => handleNotifChange('customerNotifications', 'enabled', v)} disabled={!settings.allNotifications.enabled} />
-                    {settings.customerNotifications.enabled && (
-                        <div className="pl-3 border-l-2 border-gray-300 space-y-1 mt-1">
-                            <Toggle label="เมื่อมีการจองใหม่" checked={settings.customerNotifications.newBooking} onChange={v => handleNotifChange('customerNotifications', 'newBooking', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อยืนยันนัดหมาย" checked={settings.customerNotifications.appointmentConfirmed} onChange={v => handleNotifChange('customerNotifications', 'appointmentConfirmed', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อบริการเสร็จสิ้น" checked={settings.customerNotifications.serviceCompleted} onChange={v => handleNotifChange('customerNotifications', 'serviceCompleted', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="เมื่อยกเลิกนัดหมาย" checked={settings.customerNotifications.appointmentCancelled} onChange={v => handleNotifChange('customerNotifications', 'appointmentCancelled', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="แจ้งเตือนล่วงหน้า 1 ชม." checked={settings.customerNotifications.appointmentReminder} onChange={v => handleNotifChange('customerNotifications', 'appointmentReminder', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="แจ้งเตือนประจำวัน" checked={settings.customerNotifications.dailyAppointmentNotification} onChange={v => handleNotifChange('customerNotifications', 'dailyAppointmentNotification', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="แจ้งเตือนชำระเงิน" checked={settings.customerNotifications.paymentInvoice} onChange={v => handleNotifChange('customerNotifications', 'paymentInvoice', v)} disabled={!settings.allNotifications.enabled} />
-                            <Toggle label="แจ้งเตือนขอรีวิว" checked={settings.customerNotifications.reviewRequest} onChange={v => handleNotifChange('customerNotifications', 'reviewRequest', v)} disabled={!settings.allNotifications.enabled} />
-                        </div>
-                    )}
-                </Card>
-
-                {/* Google Calendar */}
-                <Card title="Google Calendar">
-                    <Toggle label="เปิดการเชื่อมต่อ" checked={calendarSettings.enabled} onChange={v => setCalendarSettings((p: any) => ({ ...p, enabled: v }))} />
-                    {calendarSettings.enabled && (
-                        <div className="space-y-1.5 mt-1.5">
-                            <Input label="Calendar ID" value={calendarSettings.calendarId} onChange={(e: any) => setCalendarSettings((p: any) => ({ ...p, calendarId: e.target.value }))} placeholder="your-email@group.calendar.google.com" />
-                            <p className="text-[10px] text-gray-500 font-medium">ต้องแชร์ปฏิทินให้ Service Account Email</p>
-                        </div>
-                    )}
-                </Card>
-
-                {/* ทดสอบแจ้งเตือน */}
-                <Card title="ทดสอบแจ้งเตือน">
-                    <p className="text-xs text-gray-500 mb-2">ส่งแจ้งเตือนประจำวัน (Manual)</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => handleSendNow(true)} disabled={isSending} className="px-4 py-2 rounded-lg text-sm font-semibold btn-secondary">
-                            {isSending ? '...' : '🎭 ทดสอบ'}
-                        </button>
-                        <button onClick={() => handleSendNow(false)} disabled={isSending} className="px-4 py-2 rounded-lg text-sm font-semibold btn-primary">
-                            {isSending ? '...' : '🚀 ส่งจริง'}
-                        </button>
-                    </div>
-                </Card>
-
-                {/* Firestore Indexes */}
-                <Card title="Firestore Indexes">
-                    <p className="text-xs text-gray-500 mb-2">ตรวจสอบ Indexes ที่จำเป็น</p>
-                    <button onClick={handleCheckIndexes} disabled={isCheckingIndexes} className="w-full px-4 py-2 rounded-lg text-sm font-semibold btn-primary">
-                        {isCheckingIndexes ? 'กำลังตรวจสอบ...' : '🔍 ตรวจสอบ Indexes'}
-                    </button>
-                    {indexResults && (
-                        <div className="mt-2 space-y-1.5">
-                            <div className="flex gap-2">
-                                <div className="flex-1 bg-green-50 p-1.5 rounded border border-green-200 text-center"><div className="text-md font-bold text-green-700">{indexResults.okCount}</div><div className="text-[10px] text-green-600 font-semibold">พร้อม</div></div>
-                                <div className="flex-1 bg-red-50 p-1.5 rounded border border-red-200 text-center"><div className="text-md font-bold text-red-700">{indexResults.missingCount}</div><div className="text-[10px] text-red-600 font-semibold">ต้องสร้าง</div></div>
+                                <div className="p-3 bg-[#faf8f5] rounded-xl border border-[#f0eae4]">
+                                    <Toggle
+                                        label="ให้แต้มต่อการเข้ารับบริการแต่ละครั้ง"
+                                        description="แจกแต้มตายตัวทุกครั้งที่มาใช้บริการโดยไม่คำนึงถึงยอดเงิน"
+                                        checked={pointSettings.enableVisitPoints}
+                                        onChange={v => setPointSettings((p: any) => ({ ...p, enableVisitPoints: v }))}
+                                    />
+                                    {pointSettings.enableVisitPoints && (
+                                        <div className="mt-2 pt-2 border-t border-[#e7e0da]">
+                                            <Input
+                                                label="จำนวนแต้มที่ได้รับต่อการมาเยือน 1 ครั้ง"
+                                                type="number"
+                                                value={pointSettings.pointsPerVisit}
+                                                onChange={(e: any) => setPointSettings((p: any) => ({ ...p, pointsPerVisit: parseInt(e.target.value) || 1 }))}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            {indexResults.indexUrls && indexResults.indexUrls.length > 0 && indexResults.indexUrls.map((item, idx) => (
-                                <a key={idx} href={item.url} target="_blank" rel="noopener noreferrer" className="block p-2 bg-amber-50 rounded-lg border border-amber-200 hover:border-amber-400 text-xs">
-                                    <div className="font-semibold text-gray-800">{item.name}</div>
-                                    <div className="text-[10px] text-gray-500 mt-0.5">{item.description}</div>
-                                </a>
-                            ))}
-                            {indexResults.missingCount === 0 && <div className="bg-green-50 p-1.5 rounded border border-green-200 text-green-700 text-xs text-center font-semibold">✅ Indexes พร้อมใช้งาน</div>}
-                        </div>
-                    )}
-                </Card>
+                        </SettingCard>
+                    </div>
+                )}
 
+                {/* TAB 5: แจ้งเตือน LINE */}
+                {activeTab === 'notifications' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <SettingCard title="แจ้งเตือน LINE สำหรับผู้ดูแล (Admin)" description="ส่งข้อความแจ้งเตือนเข้าห้องแชตผู้ดูแล">
+                            <div className="p-3 bg-[#faf6f0] rounded-xl border border-[#e7e0da] mb-3">
+                                <Toggle
+                                    label="ระบบแจ้งเตือนหลักทั้งหมด"
+                                    description="สวิตช์เปิด/ปิดการส่งข้อความแจ้งเตือนทั้งหมดของระบบ"
+                                    checked={settings.allNotifications.enabled}
+                                    onChange={v => handleNotifChange('allNotifications', 'enabled', v)}
+                                />
+                            </div>
+
+                            <Toggle
+                                label="เปิดใช้งานแจ้งเตือน Admin"
+                                checked={settings.adminNotifications.enabled}
+                                onChange={v => handleNotifChange('adminNotifications', 'enabled', v)}
+                                disabled={!settings.allNotifications.enabled}
+                            />
+
+                            {settings.adminNotifications.enabled && (
+                                <div className="pl-3 border-l-2 border-[#d7ccc8] space-y-2 mt-2">
+                                    <Toggle label="เมื่อมีรายการจองใหม่เข้ามา" checked={settings.adminNotifications.newBooking} onChange={v => handleNotifChange('adminNotifications', 'newBooking', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="เมื่อลูกค้ายืนยันคิวแล้ว" checked={settings.adminNotifications.customerConfirmed} onChange={v => handleNotifChange('adminNotifications', 'customerConfirmed', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="เมื่อมีการยกเลิกการนัดหมาย" checked={settings.adminNotifications.bookingCancelled} onChange={v => handleNotifChange('adminNotifications', 'bookingCancelled', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="เมื่อมีการชำระเงินสำเร็จ" checked={settings.adminNotifications.paymentReceived} onChange={v => handleNotifChange('adminNotifications', 'paymentReceived', v)} disabled={!settings.allNotifications.enabled} />
+                                </div>
+                            )}
+                        </SettingCard>
+
+                        <SettingCard title="แจ้งเตือน LINE สำหรับลูกค้า" description="ส่งข้อความอัตโนมัติหาลูกค้าผ่าน LINE Official Account">
+                            <Toggle
+                                label="เปิดใช้งานแจ้งเตือนลูกค้า"
+                                checked={settings.customerNotifications.enabled}
+                                onChange={v => handleNotifChange('customerNotifications', 'enabled', v)}
+                                disabled={!settings.allNotifications.enabled}
+                            />
+
+                            {settings.customerNotifications.enabled && (
+                                <div className="pl-3 border-l-2 border-[#d7ccc8] space-y-2 mt-2">
+                                    <Toggle label="ส่งข้อความตอบรับเมื่อจองสำเร็จ" checked={settings.customerNotifications.newBooking} onChange={v => handleNotifChange('customerNotifications', 'newBooking', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="แจ้งเตือนเมื่อแอดมินอนุมัติคิว" checked={settings.customerNotifications.appointmentConfirmed} onChange={v => handleNotifChange('customerNotifications', 'appointmentConfirmed', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="แจ้งเตือนเมื่อบริการเสร็จสิ้น" checked={settings.customerNotifications.serviceCompleted} onChange={v => handleNotifChange('customerNotifications', 'serviceCompleted', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="แจ้งเตือนเมื่อคิวถูกยกเลิก" checked={settings.customerNotifications.appointmentCancelled} onChange={v => handleNotifChange('customerNotifications', 'appointmentCancelled', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="แจ้งเตือนล่วงหน้า 1 ชั่วโมงก่อนถึงเวลา" checked={settings.customerNotifications.appointmentReminder} onChange={v => handleNotifChange('customerNotifications', 'appointmentReminder', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="แจ้งเตือนสรุปคิวประจำวัน" checked={settings.customerNotifications.dailyAppointmentNotification} onChange={v => handleNotifChange('customerNotifications', 'dailyAppointmentNotification', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="ส่งใบเสร็จรับเงิน/หลักฐานชำระ" checked={settings.customerNotifications.paymentInvoice} onChange={v => handleNotifChange('customerNotifications', 'paymentInvoice', v)} disabled={!settings.allNotifications.enabled} />
+                                    <Toggle label="ขอความคิดเห็น/รีวิวหลังรับบริการ" checked={settings.customerNotifications.reviewRequest} onChange={v => handleNotifChange('customerNotifications', 'reviewRequest', v)} disabled={!settings.allNotifications.enabled} />
+                                </div>
+                            )}
+                        </SettingCard>
+                    </div>
+                )}
+
+                {/* TAB 6: ระบบ & เชื่อมต่อ */}
+                {activeTab === 'system' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <SettingCard title="Google Calendar" description="ซิงค์ตารางนัดหมายอัตโนมัติกับ Google Calendar">
+                            <Toggle
+                                label="เปิดการเชื่อมต่อ Google Calendar"
+                                checked={calendarSettings.enabled}
+                                onChange={v => setCalendarSettings((p: any) => ({ ...p, enabled: v }))}
+                            />
+                            {calendarSettings.enabled && (
+                                <div className="mt-3 space-y-2">
+                                    <Input
+                                        label="Google Calendar ID"
+                                        value={calendarSettings.calendarId}
+                                        onChange={(e: any) => setCalendarSettings((p: any) => ({ ...p, calendarId: e.target.value }))}
+                                        placeholder="xxx@group.calendar.google.com"
+                                        hint="อย่าลืมแชร์สิทธิ์ Manage Changes ให้กับ Service Account Email"
+                                    />
+                                </div>
+                            )}
+                        </SettingCard>
+
+                        <SettingCard title="ทดสอบการส่งแจ้งเตือน" description="ส่งแจ้งเตือนประจำวัน (Manual Trigger)">
+                            <p className="text-xs text-stone-500 mb-3">ทดสอบจำลองหรือสั่งส่งข้อความคิวงานประจำวันทันที</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSendNow(true)}
+                                    disabled={isSending}
+                                    className="px-3 py-2 rounded-xl text-xs font-semibold text-[#5d4037] bg-[#faf8f5] hover:bg-[#efebe9] border border-[#d7ccc8] transition-colors disabled:opacity-50"
+                                >
+                                    {isSending ? '...' : '🎭 จำลองส่ง (Mock)'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSendNow(false)}
+                                    disabled={isSending}
+                                    className="px-3 py-2 rounded-xl text-xs font-semibold text-white bg-[#5d4037] hover:bg-[#3e2723] transition-colors shadow-2xs disabled:opacity-50"
+                                >
+                                    {isSending ? '...' : '🚀 ยืนยันส่งจริง'}
+                                </button>
+                            </div>
+                        </SettingCard>
+
+                        <SettingCard title="ตรวจสอบ Indexes ฐานข้อมูล" description="ตรวจเช็กดัชนี Composite เพื่อประสิทธิภาพการค้นหา">
+                            <button
+                                type="button"
+                                onClick={handleCheckIndexes}
+                                disabled={isCheckingIndexes}
+                                className="w-full px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#5d4037] hover:bg-[#3e2723] transition-colors shadow-2xs disabled:opacity-50"
+                            >
+                                {isCheckingIndexes ? 'กำลังตรวจสอบ...' : '🔍 ตรวจสอบ Indexes'}
+                            </button>
+
+                            {indexResults && (
+                                <div className="mt-3 space-y-2">
+                                    <div className="flex gap-2 text-xs">
+                                        <div className="flex-1 bg-emerald-50 p-2 rounded-lg border border-emerald-200 text-center">
+                                            <div className="font-bold text-emerald-800 text-base">{indexResults.okCount}</div>
+                                            <div className="text-[11px] text-emerald-700">พร้อมใช้งาน</div>
+                                        </div>
+                                        <div className="flex-1 bg-rose-50 p-2 rounded-lg border border-rose-200 text-center">
+                                            <div className="font-bold text-rose-800 text-base">{indexResults.missingCount}</div>
+                                            <div className="text-[11px] text-rose-700">ต้องสร้างเพิ่ม</div>
+                                        </div>
+                                    </div>
+                                    {indexResults.missingCount === 0 && (
+                                        <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200 text-emerald-800 text-xs text-center font-semibold">
+                                            ✅ Indexes ทั้งหมดพร้อมใช้งานสมบูรณ์
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </SettingCard>
+                    </div>
+                )}
             </div>
         </div>
     );
