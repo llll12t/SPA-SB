@@ -380,3 +380,12 @@ VALUES
         }
     }'::JSONB, NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- DEFAULT SEED DATA (Admin Instructions)
+-- ==============================================================================
+-- หมายเหตุ: ทาง Supabase ไม่อนุญาตให้ทำ INSERT ลง auth.users โดยตรงผ่าน SQL
+-- เพราะระบบ GoTrue Auth ต้องการ auth.identities และฟิลด์ภายในเฉพาะ
+-- ในการสร้าง Admin แนะนำให้รันคำสั่ง: node scripts/create-admin.mjs
+
+
