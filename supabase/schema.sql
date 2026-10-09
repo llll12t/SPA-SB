@@ -269,15 +269,36 @@ CREATE INDEX IF NOT EXISTS idx_notifications_createdAt ON public.notifications("
 -- ==============================================================================
 -- REALTIME SUBSCRIPTIONS
 -- ==============================================================================
--- Enable Realtime for live UI updates
-ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.customers;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.coupons;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.rewards;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.technicians;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
+-- Enable Realtime for live UI updates (ปลอดภัย รันซ้ำได้ไม่เกิด Error 42710)
+DO $$
+DECLARE
+    tbl text;
+    tables text[] := ARRAY[
+        'appointments',
+        'notifications',
+        'customers',
+        'coupons',
+        'rewards',
+        'services',
+        'technicians',
+        'settings'
+    ];
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        FOREACH tbl IN ARRAY tables LOOP
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_publication_tables 
+                WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+            ) THEN
+                BEGIN
+                    EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I;', tbl);
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+            END IF;
+        END LOOP;
+    END IF;
+END $$;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -297,21 +318,30 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."pointMergeHistory" ENABLE ROW LEVEL SECURITY;
 
--- Allow public / anon and authenticated access for SPA app operations
--- (The application also uses server-side service role key for admin operations)
-CREATE POLICY "Public Read/Write for admins" ON public.admins FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for employees" ON public.employees FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for customers" ON public.customers FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for customers_by_phone" ON public.customers_by_phone FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for services" ON public.services FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for technicians" ON public.technicians FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for appointments" ON public.appointments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for rewards" ON public.rewards FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for coupons" ON public.coupons FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for reviews" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public Read/Write for pointMergeHistory" ON public."pointMergeHistory" FOR ALL USING (true) WITH CHECK (true);
+-- Allow public / anon and authenticated access for SPA app operations (ปลอดภัย รันซ้ำได้ไม่เกิด Error policy already exists)
+DO $$
+DECLARE
+    item record;
+BEGIN
+    FOR item IN (
+        SELECT 'Public Read/Write for admins' AS pol, 'admins' AS tbl UNION ALL
+        SELECT 'Public Read/Write for employees', 'employees' UNION ALL
+        SELECT 'Public Read/Write for customers', 'customers' UNION ALL
+        SELECT 'Public Read/Write for customers_by_phone', 'customers_by_phone' UNION ALL
+        SELECT 'Public Read/Write for services', 'services' UNION ALL
+        SELECT 'Public Read/Write for technicians', 'technicians' UNION ALL
+        SELECT 'Public Read/Write for appointments', 'appointments' UNION ALL
+        SELECT 'Public Read/Write for rewards', 'rewards' UNION ALL
+        SELECT 'Public Read/Write for coupons', 'coupons' UNION ALL
+        SELECT 'Public Read/Write for reviews', 'reviews' UNION ALL
+        SELECT 'Public Read/Write for notifications', 'notifications' UNION ALL
+        SELECT 'Public Read/Write for settings', 'settings' UNION ALL
+        SELECT 'Public Read/Write for pointMergeHistory', 'pointMergeHistory'
+    ) LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I;', item.pol, item.tbl);
+        EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (true) WITH CHECK (true);', item.pol, item.tbl);
+    END LOOP;
+END $$;
 
 -- ==============================================================================
 -- DEFAULT SEED DATA (Settings)
