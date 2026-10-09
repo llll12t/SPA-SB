@@ -22,17 +22,33 @@ const getNotificationSettings = async () => {
 };
 
 const requireEmployeeAuth = async (auth?: AuthContext) => {
-    const lineAuth = await requireLineAuth(auth);
-    if (!lineAuth.ok) return { ok: false, error: lineAuth.error };
-    const lineUserId = lineAuth.value.userId;
-    if (!lineUserId) return { ok: false, error: 'Missing LINE user.' };
-
-    const snapshot = await db.collection('employees').where('lineUserId', '==', lineUserId).limit(1).get();
-    if (snapshot.empty) {
-        return { ok: false, error: 'Employee access denied.' };
+    // 1. อนุญาตให้ bypass อัตโนมัติหากอยู่ในโหมด Development
+    if (process.env.NODE_ENV !== 'production') {
+        return { ok: true, employeeId: 'dev-employee', lineUserId: 'dev-user', isDevFallback: true };
     }
 
-    return { ok: true, employeeId: snapshot.docs[0].id, lineUserId };
+    const lineAuth = await requireLineAuth(auth);
+    if (!lineAuth.ok) {
+        return { ok: false, error: lineAuth.error };
+    }
+    const lineUserId = lineAuth.value.userId;
+    if (!lineUserId) {
+        return { ok: false, error: 'ไม่พบข้อมูลบัญชีผู้ใช้ LINE' };
+    }
+
+    // 2. ตรวจสอบในตารางพนักงาน (employees)
+    const snapshot = await db.collection('employees').where('lineUserId', '==', lineUserId).limit(1).get();
+    if (!snapshot.empty) {
+        return { ok: true, employeeId: snapshot.docs[0].id, lineUserId };
+    }
+
+    // 3. ตรวจสอบในตารางผู้ดูแลระบบ (admins) เผื่อแอดมินเป็นผู้ดำเนินการเช็คอินเอง
+    const adminSnap = await db.collection('admins').where('lineUserId', '==', lineUserId).limit(1).get();
+    if (!adminSnap.empty) {
+        return { ok: true, employeeId: adminSnap.docs[0].id, lineUserId, isAdmin: true };
+    }
+
+    return { ok: false, error: 'บัญชี LINE นี้ยังไม่ได้ลงทะเบียนเป็นพนักงานหรือผู้ดูแลระบบ' };
 };
 
 // --- Registration and Status Updates ---

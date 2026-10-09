@@ -46,6 +46,10 @@ export default function CheckInPage() {
             return;
         }
         try {
+            if (typeof liff.scanCodeV2 !== 'function') {
+                showToast('ฟังก์ชันสแกน QR Code ยังไม่เปิดใช้งานใน LIFF นี้', 'error');
+                return;
+            }
             const result = await liff.scanCodeV2();
             if (result && result.value) {
                 setLoading(true);
@@ -57,11 +61,21 @@ export default function CheckInPage() {
                     setMessage('');
                 } else {
                     setMessage(`ไม่พบข้อมูล: ${searchResult.error}`);
+                    showToast(searchResult.error, 'error');
                 }
                 setLoading(false);
             }
         } catch (error: any) {
-            setMessage(`เกิดข้อผิดพลาด: ${error.message || 'ไม่สามารถสแกน QR Code ได้'}`);
+            console.error("Scan error:", error);
+            if (error?.message?.includes('cancel') || error?.code === 'USER_CANCEL') {
+                return;
+            }
+            if (error?.message?.includes('permission') || error?.message?.includes('available')) {
+                showToast('กรุณาเปิดสิทธิ์ "Scan QR" ใน LINE Developers Console (LIFF App)', 'error');
+            } else {
+                setMessage(`เกิดข้อผิดพลาด: ${error.message || 'ไม่สามารถสแกน QR Code ได้'}`);
+                showToast(error.message || 'ไม่สามารถสแกน QR Code ได้', 'error');
+            }
         }
     };
 

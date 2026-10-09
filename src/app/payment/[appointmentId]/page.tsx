@@ -1,20 +1,46 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { doc, getDoc, db } from '@/app/lib/supabaseDb';
 import QRCode from 'qrcode';
 import generatePayload from 'promptpay-qr';
 import { Appointment } from '@/types';
 
-export default function PaymentPage() {
+function PaymentContent() {
     const params = useParams();
-    const appointmentId = params?.appointmentId as string;
+    const searchParams = useSearchParams();
     const [appointment, setAppointment] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
     const [paymentSettings, setPaymentSettings] = useState<any | null>(null);
+
+    // Resolve appointmentId from all possible sources (params, query, liff.state, pathname)
+    let appointmentId = params?.appointmentId as string;
+    if (!appointmentId && searchParams) {
+        appointmentId = searchParams.get('appointmentId') as string;
+    }
+    if (!appointmentId && searchParams) {
+        const liffState = searchParams.get('liff.state');
+        if (liffState) {
+            try {
+                const decoded = decodeURIComponent(liffState);
+                const parts = decoded.split('/');
+                const idx = parts.findIndex(p => p === 'payment');
+                if (idx !== -1 && parts.length > idx + 1) {
+                    appointmentId = parts[idx + 1].split('?')[0];
+                }
+            } catch {}
+        }
+    }
+    if (!appointmentId && typeof window !== 'undefined') {
+        const pathParts = window.location.pathname.split('/');
+        const idx = pathParts.findIndex(p => p === 'payment');
+        if (idx !== -1 && pathParts.length > idx + 1) {
+            appointmentId = pathParts[idx + 1].split('?')[0];
+        }
+    }
 
     useEffect(() => {
         const fetchAppointmentAndSettings = async () => {
@@ -186,3 +212,17 @@ export default function PaymentPage() {
         </div>
     );
 }
+
+export default function PaymentPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex flex-col justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#d7ccc8] border-t-[#5d4037] mx-auto mb-3"></div>
+                <p className="text-[#8d6e63] text-xs font-medium">กำลังโหลดข้อมูลการชำระเงิน...</p>
+            </div>
+        }>
+            <PaymentContent />
+        </Suspense>
+    );
+}
+

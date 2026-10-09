@@ -1,6 +1,6 @@
 'use server';
 
-import { getShopProfile } from './settingsActions';
+import { getShopProfile, getNotificationSettings } from './settingsActions';
 
 /**
  * Generates a Flex Message JSON payload for a new booking confirmation.
@@ -24,6 +24,15 @@ export async function getNewBookingFlexJson(bookingData: {
     const currencySymbol = profile?.currencySymbol || 'บาท';
     const shopName = profile?.shopName || 'ร้านของเรา';
 
+    let liffId = process.env.NEXT_PUBLIC_LIFF_ID || '';
+    if (!liffId) {
+        try {
+            const { settings } = await getNotificationSettings();
+            liffId = settings?.lineNotifications?.liffId?.trim() || '';
+        } catch {}
+    }
+    const myAppointmentsUri = liffId ? `https://liff.line.me/${liffId}/my-appointments` : 'https://spa-sb.vercel.app/my-appointments';
+
     const formattedAmount = new Intl.NumberFormat('th-TH').format(totalPrice);
 
     let appointmentDate = date;
@@ -39,16 +48,16 @@ export async function getNewBookingFlexJson(bookingData: {
         {
             type: 'box', layout: 'horizontal',
             contents: [
-                { type: 'text', text: 'บริการ', size: 'sm', color: '#666666', flex: 2 },
-                { type: 'text', text: serviceName, size: 'sm', color: '#333333', flex: 3, wrap: true, align: 'end', weight: 'bold' }
+                { type: 'text', text: 'บริการ', size: 'xs', color: '#777777', flex: 2 },
+                { type: 'text', text: serviceName, size: 'xs', color: '#222222', flex: 3, wrap: true, align: 'end', weight: 'bold' }
             ]
         },
         {
             type: 'box', layout: 'horizontal',
             contents: [
-                { type: 'text', text: 'วันที่', size: 'sm', color: '#666666', flex: 2 },
-                { type: 'text', text: `${appointmentDate}`, size: 'sm', color: '#333333', flex: 2, align: 'end' },
-                { type: 'text', text: time || '', size: 'sm', color: '#553734', flex: 1, align: 'end', weight: 'bold' }
+                { type: 'text', text: 'วันที่', size: 'xs', color: '#777777', flex: 2 },
+                { type: 'text', text: `${appointmentDate}`, size: 'xs', color: '#222222', flex: 2, align: 'end' },
+                { type: 'text', text: time || '', size: 'xs', color: '#553734', flex: 1, align: 'end', weight: 'bold' }
             ]
         },
     ];
@@ -58,8 +67,8 @@ export async function getNewBookingFlexJson(bookingData: {
             summaryRows.push({
                 type: 'box', layout: 'horizontal',
                 contents: [
-                    { type: 'text', text: `+ ${a.name}`, size: 'sm', color: '#888888', flex: 2 },
-                    { type: 'text', text: `${new Intl.NumberFormat('th-TH').format(a.price)} ${currencySymbol}`, size: 'sm', color: '#888888', flex: 3, align: 'end' }
+                    { type: 'text', text: `+ ${a.name}`, size: 'xs', color: '#888888', flex: 2 },
+                    { type: 'text', text: `${new Intl.NumberFormat('th-TH').format(a.price)} ${currencySymbol}`, size: 'xs', color: '#888888', flex: 3, align: 'end' }
                 ]
             });
         });
@@ -69,8 +78,8 @@ export async function getNewBookingFlexJson(bookingData: {
         summaryRows.push({
             type: 'box', layout: 'horizontal',
             contents: [
-                { type: 'text', text: couponName ? `ส่วนลด (${couponName})` : 'ส่วนลด', size: 'sm', color: '#4CAF50', flex: 2 },
-                { type: 'text', text: `-${new Intl.NumberFormat('th-TH').format(discount)} ${currencySymbol}`, size: 'sm', color: '#4CAF50', flex: 3, align: 'end' }
+                { type: 'text', text: couponName ? `ส่วนลด (${couponName})` : 'ส่วนลด', size: 'xs', color: '#2E7D32', flex: 2 },
+                { type: 'text', text: `-${new Intl.NumberFormat('th-TH').format(discount)} ${currencySymbol}`, size: 'xs', color: '#2E7D32', flex: 3, align: 'end' }
             ]
         });
     }
@@ -78,45 +87,55 @@ export async function getNewBookingFlexJson(bookingData: {
     summaryRows.push({
         type: 'box', layout: 'horizontal',
         contents: [
-            { type: 'text', text: 'รหัสการจอง', size: 'sm', color: '#666666', flex: 2 },
-            { type: 'text', text: shortId, size: 'sm', color: '#333333', flex: 3, align: 'end' }
+            { type: 'text', text: 'รหัสการจอง', size: 'xs', color: '#777777', flex: 2 },
+            { type: 'text', text: shortId, size: 'xs', color: '#222222', flex: 3, align: 'end', weight: 'bold' }
         ]
     });
 
     const flexMessage = {
         type: 'flex',
-        altText: `✅ จองบริการ "${serviceName}" สำเร็จ`,
+        altText: `ส่งคำขอจองบริการ "${serviceName}" สำเร็จ`,
         contents: {
             type: 'bubble',
             size: 'mega',
-            header: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                    { type: 'text', text: '✅ จองบริการสำเร็จ', weight: 'bold', size: 'lg', color: '#ffffff', align: 'center' },
-                    { type: 'text', text: shopName, size: 'sm', color: '#f5e6e6', align: 'center', margin: 'xs' }
-                ],
-                backgroundColor: '#553734',
-                paddingAll: '18px'
-            },
             body: {
                 type: 'box',
                 layout: 'vertical',
                 contents: [
                     {
                         type: 'text',
-                        text: `เรียน ${customerName}`,
+                        text: 'ส่งคำขอจองบริการสำเร็จ',
                         weight: 'bold',
-                        size: 'md',
-                        color: '#333333'
+                        size: 'lg',
+                        color: '#3E2723'
                     },
                     {
                         type: 'text',
-                        text: 'ระบบได้รับการจองของคุณเรียบร้อยแล้ว กรุณารอการยืนยันจากทีมงาน',
+                        text: shopName,
+                        size: 'xs',
+                        color: '#8D6E63',
+                        margin: 'xs'
+                    },
+                    {
+                        type: 'separator',
+                        color: '#EFEBE9',
+                        margin: 'md'
+                    },
+                    {
+                        type: 'text',
+                        text: `เรียน ${customerName}`,
+                        weight: 'bold',
                         size: 'sm',
+                        color: '#333333',
+                        margin: 'md'
+                    },
+                    {
+                        type: 'text',
+                        text: 'ระบบได้รับการจองของคุณเรียบร้อยแล้ว กรุณารอการตรวจสอบและยืนยันจากทางร้าน',
+                        size: 'xs',
                         color: '#666666',
                         wrap: true,
-                        margin: 'sm'
+                        margin: 'xs'
                     },
                     {
                         type: 'box',
@@ -125,19 +144,19 @@ export async function getNewBookingFlexJson(bookingData: {
                         spacing: 'sm',
                         margin: 'md',
                         paddingAll: '12px',
-                        backgroundColor: '#F8F8F8',
+                        backgroundColor: '#F9F7F5',
                         cornerRadius: '8px'
                     },
                     {
                         type: 'box',
                         layout: 'horizontal',
                         contents: [
-                            { type: 'text', text: 'ยอดรวม', weight: 'bold', size: 'md', color: '#333333', flex: 0 },
-                            { type: 'text', text: `${formattedAmount} ${currencySymbol}`, weight: 'bold', size: 'md', color: '#553734', align: 'end' }
+                            { type: 'text', text: 'ยอดรวม', weight: 'bold', size: 'sm', color: '#333333', flex: 2 },
+                            { type: 'text', text: `${formattedAmount} ${currencySymbol}`, weight: 'bold', size: 'md', color: '#553734', align: 'end', flex: 3 }
                         ],
                         margin: 'md',
-                        paddingAll: '14px',
-                        backgroundColor: '#F5F2ED',
+                        paddingAll: '12px',
+                        backgroundColor: '#F5F0EB',
                         cornerRadius: '8px'
                     },
                     {
@@ -146,7 +165,7 @@ export async function getNewBookingFlexJson(bookingData: {
                         contents: [
                             {
                                 type: 'text',
-                                text: '🙏 ขอบคุณที่ไว้วางใจเรา กรุณามาตรงเวลานะคะ',
+                                text: 'ขอบคุณที่เลือกใช้บริการของเรา กรุณามาตรงเวลานะคะ',
                                 size: 'xs',
                                 color: '#553734',
                                 wrap: true,
@@ -155,12 +174,31 @@ export async function getNewBookingFlexJson(bookingData: {
                         ],
                         margin: 'md',
                         paddingAll: '10px',
-                        backgroundColor: '#FDF5F4',
+                        backgroundColor: '#F9F7F5',
                         cornerRadius: '8px'
                     }
                 ],
-                spacing: 'md',
-                paddingAll: '20px'
+                spacing: 'sm',
+                paddingAll: '18px'
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                    {
+                        type: 'button',
+                        style: 'primary',
+                        height: 'sm',
+                        action: {
+                            type: 'uri',
+                            label: 'ดูรายการจองของฉัน',
+                            uri: myAppointmentsUri
+                        },
+                        color: '#553734'
+                    }
+                ],
+                spacing: 'sm',
+                paddingAll: '14px'
             }
         }
     };
