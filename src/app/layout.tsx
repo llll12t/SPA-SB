@@ -43,6 +43,9 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  // หากเปิดในแอป LINE ให้ LIFF SDK ทำงานตามปกติ ห้าม redirect URL ตัดหน้า
+                  if (/Line\//i.test(navigator.userAgent)) return;
+
                   var search = window.location.search;
                   if (!search) return;
                   var params = new URLSearchParams(search);
@@ -50,8 +53,8 @@ export default function RootLayout({
                   if (state) {
                     var target = decodeURIComponent(state);
                     if (target.indexOf('/') !== 0) target = '/' + target;
-                    var targetPath = target.split('?')[0].replace(/\\/+$/, '') || '/';
-                    var currentPath = window.location.pathname.replace(/\\/+$/, '') || '/';
+                    var targetPath = target.split('?')[0].replace(/\/+$/, '') || '/';
+                    var currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
                     if (currentPath !== targetPath) {
                       window.location.replace(target);
                     }
