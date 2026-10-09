@@ -43,9 +43,6 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  // หากเปิดในแอป LINE ให้ LIFF SDK ทำงานตามปกติ ห้าม redirect URL ตัดหน้า
-                  if (/Line\//i.test(navigator.userAgent)) return;
-
                   var search = window.location.search;
                   if (!search) return;
                   var params = new URLSearchParams(search);

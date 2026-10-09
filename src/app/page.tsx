@@ -1,7 +1,20 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import SpaFlowerIcon from '@/app/components/common/SpaFlowerIcon';
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const liffState = params?.['liff.state'];
+  if (typeof liffState === 'string' && liffState.trim()) {
+    let target = decodeURIComponent(liffState.trim());
+    if (!target.startsWith('/')) target = '/' + target;
+    redirect(target);
+  }
+
   return (
     <main
       className="min-h-screen relative overflow-hidden flex flex-col items-center justify-between p-5 sm:p-6"
