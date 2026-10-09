@@ -38,6 +38,29 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var search = window.location.search;
+                  if (!search) return;
+                  var params = new URLSearchParams(search);
+                  var state = params.get('liff.state');
+                  if (state) {
+                    var target = decodeURIComponent(state);
+                    if (target.indexOf('/') !== 0) target = '/' + target;
+                    var targetPath = target.split('?')[0].replace(/\\/+$/, '') || '/';
+                    var currentPath = window.location.pathname.replace(/\\/+$/, '') || '/';
+                    if (currentPath !== targetPath) {
+                      window.location.replace(target);
+                    }
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
         <Script
           src="https://static.line-scdn.net/liff/edge/2/sdk.js"
           strategy="beforeInteractive"

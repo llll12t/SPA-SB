@@ -24,12 +24,13 @@ export async function getNewBookingFlexJson(bookingData: {
     const currencySymbol = profile?.currencySymbol || 'บาท';
     const shopName = profile?.shopName || 'ร้านของเรา';
 
-    let liffId = process.env.NEXT_PUBLIC_LIFF_ID || '';
+    let liffId = '';
+    try {
+        const { settings } = await getNotificationSettings();
+        liffId = settings?.lineNotifications?.liffId?.trim() || '';
+    } catch {}
     if (!liffId) {
-        try {
-            const { settings } = await getNotificationSettings();
-            liffId = settings?.lineNotifications?.liffId?.trim() || '';
-        } catch {}
+        liffId = process.env.NEXT_PUBLIC_LIFF_ID || '';
     }
     const myAppointmentsUri = liffId ? `https://liff.line.me/${liffId}/my-appointments` : 'https://spa-sb.vercel.app/my-appointments';
 
@@ -191,7 +192,7 @@ export async function getNewBookingFlexJson(bookingData: {
                         height: 'sm',
                         action: {
                             type: 'uri',
-                            label: 'ดูรายการจองของฉัน',
+                            label: '📋 ดูรายการจองของฉัน',
                             uri: myAppointmentsUri
                         },
                         color: '#553734'

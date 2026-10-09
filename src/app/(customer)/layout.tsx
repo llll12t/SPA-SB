@@ -9,7 +9,6 @@ import { ProfileProvider } from '@/context/ProfileProvider';
 import SpaFlowerIcon from '@/app/components/common/SpaFlowerIcon';
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
-    const customerLiffId = process.env.NEXT_PUBLIC_LIFF_ID;
 
     useEffect(() => {
         const handleVisibilityChange = async () => {
@@ -33,7 +32,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
 
     return (
         <ToastProvider>
-            <LiffProvider liffId={customerLiffId}>
+            <LiffProvider>
                 <ProfileProvider>
                     <div
                         className="min-h-screen relative overflow-x-clip"

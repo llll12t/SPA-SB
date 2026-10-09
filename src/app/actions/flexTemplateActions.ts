@@ -6,9 +6,6 @@ import { getShopProfile, getNotificationSettings } from './settingsActions';
  * Checks process.env.NEXT_PUBLIC_LIFF_ID first, then DB notification settings
  */
 async function getEffectiveLiffId(): Promise<string> {
-    if (process.env.NEXT_PUBLIC_LIFF_ID && process.env.NEXT_PUBLIC_LIFF_ID.trim()) {
-        return process.env.NEXT_PUBLIC_LIFF_ID.trim();
-    }
     try {
         const notifRes = await getNotificationSettings();
         if (notifRes.success && notifRes.settings?.lineNotifications?.liffId) {
@@ -16,6 +13,9 @@ async function getEffectiveLiffId(): Promise<string> {
         }
     } catch (e) {
         console.warn("Failed to get LIFF ID from settings:", e);
+    }
+    if (process.env.NEXT_PUBLIC_LIFF_ID && process.env.NEXT_PUBLIC_LIFF_ID.trim()) {
+        return process.env.NEXT_PUBLIC_LIFF_ID.trim();
     }
     return '';
 }
@@ -156,7 +156,7 @@ export async function createPaymentFlexTemplate(appointmentData: any) {
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ชำระเงิน",
+                            label: "ชำระเงินตอนนี้",
                             uri: paymentUri
                         },
                         color: "#553734"
@@ -235,7 +235,7 @@ export async function createReviewFlexTemplate(appointmentData: any) {
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ให้คะแนนและรีวิว",
+                            label: "⭐ ให้คะแนนและรีวิว",
                             uri: reviewUri
                         },
                         color: "#553734"
@@ -399,7 +399,7 @@ export async function createAppointmentConfirmedFlexTemplate(appointmentData: an
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ดูรายการจองของฉัน",
+                            label: "📋 ดูรายการจองของฉัน",
                             uri: myAppointmentsUri
                         },
                         color: "#2E7D32"
@@ -492,7 +492,7 @@ export async function createServiceCompletedFlexTemplate(appointmentData: any, o
                     height: "sm",
                     action: {
                         type: "uri",
-                        label: "ให้คะแนนและรีวิวบริการ",
+                        label: "⭐ ให้คะแนนและรีวิวบริการ",
                         uri: reviewUri
                     },
                     color: "#553734"
@@ -628,7 +628,7 @@ export async function createNewBookingFlexTemplate(appointmentData: any) {
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ตรวจสอบสถานะการจอง",
+                            label: "📋 ดูรายการจองของฉัน",
                             uri: myAppointmentsUri
                         },
                         color: "#553734"
@@ -712,7 +712,7 @@ export async function createPaymentConfirmationFlexTemplate(appointmentData: any
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ดูรายการจองของฉัน",
+                            label: "📋 ดูรายการจองของฉัน",
                             uri: myAppointmentsUri
                         },
                         color: "#2E7D32"
@@ -794,7 +794,7 @@ export async function createAppointmentReminderFlexTemplate(bookingData: any) {
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ดูรายละเอียดการจอง",
+                            label: "📋 ดูรายละเอียดนัดหมาย",
                             uri: myAppointmentsUri
                         },
                         color: "#795548"
@@ -876,7 +876,7 @@ export async function createDailyAppointmentNotificationFlexTemplate(appointment
                         height: "sm",
                         action: {
                             type: "uri",
-                            label: "ดูรายละเอียดการจอง",
+                            label: "📋 ตรวจสอบเวลานัดหมาย",
                             uri: myAppointmentsUri
                         },
                         color: "#553734"
