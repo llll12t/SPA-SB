@@ -300,10 +300,15 @@ export async function updateAppointmentStatusByAdmin(appointmentId: string, newS
                     if (newStatus === 'confirmed' && settingsData.customerNotifications?.appointmentConfirmed) {
                         await sendAppointmentConfirmedFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
                     } else if (newStatus === 'completed') {
-                        if (settingsData.customerNotifications?.serviceCompleted) {
-                            await sendServiceCompletedFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
-                        }
-                        if (settingsData.customerNotifications?.reviewRequest) {
+                        const hasServiceCompleted = !!settingsData.customerNotifications?.serviceCompleted;
+                        const hasReviewRequest = !!settingsData.customerNotifications?.reviewRequest;
+
+                        if (hasServiceCompleted && hasReviewRequest) {
+                            // Consolidate into a single All-in-One Flex message with review button
+                            await sendServiceCompletedFlexMessage(appointment.userId, { ...appointment, id: appointmentId }, { includeReviewButton: true });
+                        } else if (hasServiceCompleted) {
+                            await sendServiceCompletedFlexMessage(appointment.userId, { ...appointment, id: appointmentId }, { includeReviewButton: false });
+                        } else if (hasReviewRequest) {
                             await sendReviewFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
                         }
                     }
@@ -363,8 +368,7 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId: string,
                 if (customerNotificationsEnabled) {
                     if (settingsData.customerNotifications?.paymentInvoice) {
                         await sendPaymentConfirmationFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
-                    }
-                    if (settingsData.customerNotifications?.appointmentConfirmed) {
+                    } else if (settingsData.customerNotifications?.appointmentConfirmed) {
                         await sendAppointmentConfirmedFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
                     }
                 }

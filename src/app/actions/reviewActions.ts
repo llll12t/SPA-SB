@@ -48,6 +48,8 @@ export async function submitReview(reviewData: any, auth?: AuthContext) {
             pointsToAward = 5;
         }
 
+        let appointmentDataForMessage: any = null;
+
         await db.runTransaction(async (transaction: any) => {
             // Read all docs first
             const appointmentDoc = await transaction.get(appointmentRef);
@@ -55,6 +57,7 @@ export async function submitReview(reviewData: any, auth?: AuthContext) {
                 throw new Error('ไม่พบข้อมูลการนัดหมายนี้');
             }
             const appointmentData = appointmentDoc.data();
+            appointmentDataForMessage = appointmentData;
             if (!appointmentData.userId) {
                 throw new Error('ข้อมูลการนัดหมายนี้ไม่มี LINE User ID กรุณาติดต่อแอดมิน');
             }
@@ -113,8 +116,14 @@ export async function submitReview(reviewData: any, auth?: AuthContext) {
             }
         });
 
-        // Send thank you message with points info
-        await sendReviewThankYouFlexMessage(userId, pointsToAward);
+        // Send thank you message with points info and review details
+        const customerName = appointmentDataForMessage?.customerInfo?.fullName || appointmentDataForMessage?.customerInfo?.name || 'คุณลูกค้า';
+        await sendReviewThankYouFlexMessage(userId, {
+            rating: Number(rating),
+            comment: comment || '',
+            customerName,
+            pointsAwarded: pointsToAward
+        });
 
         return { success: true };
     } catch (error: any) {

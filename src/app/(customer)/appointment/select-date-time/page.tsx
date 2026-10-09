@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db, collection, getDocs, query, where, orderBy, doc, getDoc } from '@/app/lib/supabaseDb';
 import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
 import Image from 'next/image';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useToast } from '@/app/components/Toast';
@@ -22,9 +23,15 @@ interface TechnicianCardProps {
 const TechnicianCard: React.FC<TechnicianCardProps> = ({ technician, isSelected, onSelect, isAvailable }) => (
     <div
         onClick={() => isAvailable && onSelect(technician)}
-        className={`rounded-2xl p-4 flex items-center space-x-4 transition-all w-full shadow-sm ${!isAvailable ? 'bg-gray-100 opacity-60 cursor-not-allowed' : isSelected ? 'bg-[#F5F2ED] ring-2 ring-[#5D4037] cursor-pointer' : 'bg-white cursor-pointer hover:shadow-md'}`}
+        className={`rounded-2xl p-3.5 flex items-center space-x-3.5 transition-all w-full border ${
+            !isAvailable
+                ? 'bg-gray-50/70 border-gray-200/60 opacity-60 cursor-not-allowed'
+                : isSelected
+                    ? 'bg-[#5d4037]/5 border-[#5d4037] ring-2 ring-[#5d4037]/30 shadow-sm cursor-pointer'
+                    : 'bg-white border-[#e7e0da] hover:border-[#8d6e63] hover:shadow-sm cursor-pointer'
+        }`}
     >
-        <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+        <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white shadow-sm">
             {technician.imageUrl ? (
                 <img
                     src={technician.imageUrl}
@@ -32,22 +39,29 @@ const TechnicianCard: React.FC<TechnicianCardProps> = ({ technician, isSelected,
                     className="w-full h-full object-cover"
                 />
             ) : (
-                <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
+                <div className="w-full h-full bg-[#f5f0eb] flex items-center justify-center text-[#5d4037] font-bold text-base">
                     {technician.firstName.charAt(0)}
                 </div>
             )}
         </div>
-        <div className="flex-1">
-            <p className="font-bold text-lg text-gray-800">{technician.firstName}</p>
+        <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm text-[#3e2723] truncate">{technician.firstName} {technician.lastName || ''}</p>
+            {technician.nickname && (
+                <p className="text-xs text-[#8d6e63]">({technician.nickname})</p>
+            )}
         </div>
-        <div className="flex items-center space-x-3">
-            <p className={`text-sm px-3 py-1 rounded-full ${isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className="flex items-center space-x-2.5">
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                isAvailable
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                    : 'bg-rose-50 text-rose-600 border border-rose-200/60'
+            }`}>
                 {isAvailable ? 'ว่าง' : 'ไม่ว่าง'}
-            </p>
+            </span>
             {isSelected && isAvailable && (
-                <div className="w-6 h-6 bg-[#5D4037] rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                <div className="w-6 h-6 bg-[#5d4037] rounded-full flex items-center justify-center shadow-sm">
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                 </div>
             )}
@@ -213,11 +227,10 @@ function SelectDateTimeContent() {
         const bufferTime = bufferMinutes || 0;
 
         appointmentsForDay.forEach(appt => {
-            if (!appt.time || !appt.serviceInfo?.duration) return; // Ensure duration exists
+            if (!appt.time || !appt.serviceInfo?.duration) return;
 
             const [hours, minutes] = appt.time.split(':').map(Number);
             const startMinutes = hours * 60 + minutes;
-            // Use fallback duration of 60 if missing
             const duration = appt.serviceInfo?.duration || appt.appointmentInfo?.duration || 60;
             const endMinutes = startMinutes + duration + bufferTime;
 
@@ -270,7 +283,7 @@ function SelectDateTimeContent() {
         setSelectedTechnician(null);
     }, [date]);
 
-    // --- แก้ไข: ส่งค่า params ทั้งหมดต่อไปยังหน้า General Info ---
+    // Forward params to General Info
     const handleConfirm = () => {
         if (!date || !time) {
             showToast('กรุณาเลือกวันและเวลาที่ต้องการจอง', "warning");
@@ -278,7 +291,7 @@ function SelectDateTimeContent() {
         }
 
         if (useTechnician && !selectedTechnician) {
-            showToast('กรุณาเลือกช่างเสริมสวยที่ต้องการ', "warning");
+            showToast('กรุณาเลือกผู้ให้บริการที่ต้องการ', "warning");
             return;
         }
 
@@ -290,7 +303,7 @@ function SelectDateTimeContent() {
         if (areaIndex !== null) params.set('areaIndex', areaIndex);
         if (packageIndex !== null) params.set('packageIndex', packageIndex);
 
-        // Option-Based Params (ส่งต่อ)
+        // Option-Based Params
         if (selectedOptionName) params.set('selectedOptionName', selectedOptionName);
         if (selectedOptionPrice) params.set('selectedOptionPrice', selectedOptionPrice);
         if (selectedOptionDuration) params.set('selectedOptionDuration', selectedOptionDuration);
@@ -336,11 +349,23 @@ function SelectDateTimeContent() {
     };
 
     return (
-        <div>
+        <div className="min-h-screen bg-[#faf8f5]">
             <CustomerHeader showBackButton={true} showActionButtons={false} backUrl="/appointment" />
-            <div className="min-h-screen flex flex-col items-center px-6 py-2 pb-32">
-                {/* Calendar */}
-                <div className="w-full bg-white p-4 rounded-2xl max-w-md mx-auto flex flex-col items-center shadow-sm border border-gray-100">
+            
+            <div className="w-full max-w-md mx-auto px-4 py-4 pb-36 space-y-6">
+                
+                {/* Step indicator */}
+                <div className="flex items-center justify-between text-xs px-1">
+                    <span className="font-semibold text-[#5d4037] flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-[#5d4037] text-white flex items-center justify-center text-[11px] font-bold">2</span>
+                        เลือกวันและเวลาที่สะดวก
+                    </span>
+                    <span className="text-[#8d6e63]">ขั้นตอน 2 จาก 3</span>
+                </div>
+
+                {/* Calendar Card */}
+                <div className="w-full bg-white p-5 rounded-3xl shadow-sm border border-[#e7e0da]">
+                    {/* Month Navigator */}
                     <div className="flex items-center justify-between w-full mb-4">
                         <button
                             onClick={() => setActiveMonth(prev => {
@@ -348,9 +373,14 @@ function SelectDateTimeContent() {
                                 d.setMonth(d.getMonth() - 1);
                                 return d;
                             })}
-                            className="px-3 py-2 text-xl text-[#5D4037] hover:bg-gray-100 rounded-full transition-colors"
-                        >&#60;</button>
-                        <span className="font-bold text-lg text-[#5D4037]">
+                            className="w-9 h-9 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
+                            aria-label="Previous month"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <span className="font-bold text-base text-[#3e2723]">
                             {activeMonth.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
                         </span>
                         <button
@@ -359,25 +389,31 @@ function SelectDateTimeContent() {
                                 d.setMonth(d.getMonth() + 1);
                                 return d;
                             })}
-                            className="px-3 py-2 text-xl text-[#5D4037] hover:bg-gray-100 rounded-full transition-colors"
-                        >&#62;</button>
+                            className="w-9 h-9 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
+                            aria-label="Next month"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
                     </div>
+
                     <div className="w-full">
-                        {/* Header วันในสัปดาห์ */}
-                        <div className="grid grid-cols-7 gap-1 mb-2">
+                        {/* Day names */}
+                        <div className="grid grid-cols-7 gap-1 mb-2.5">
                             {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
-                                <div key={i} className="text-sm text-[#5D4037] text-center font-semibold py-2">{d}</div>
+                                <div key={i} className="text-xs text-[#8d6e63] text-center font-semibold py-1">
+                                    {d}
+                                </div>
                             ))}
                         </div>
 
-                        {/* วันที่ในเดือน */}
+                        {/* Calendar days grid */}
                         <div className="grid grid-cols-7 gap-1.5">
                             {(() => {
                                 const year = activeMonth.getFullYear();
                                 const month = activeMonth.getMonth();
                                 const firstDay = new Date(year, month, 1);
-                                // Start from previous month days if needed to align weeks? 
-                                // Original code subtracts dayOfWeek from start date.
                                 const startDate = new Date(firstDay);
                                 startDate.setDate(startDate.getDate() - firstDay.getDay());
 
@@ -396,26 +432,30 @@ function SelectDateTimeContent() {
                                     const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
                                     const isHoliday = !!holidayInfo;
 
-                                    const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth; // Disable if not current month or closed or past
+                                    const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth;
 
                                     days.push(
                                         <button
                                             key={i}
                                             onClick={() => !isDisabled && setDate(d)}
-                                            className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-semibold transition-all relative
-                                            ${!isCurrentMonth ? 'text-gray-300' :
-                                                    isSelected ? 'bg-[#5D4037] text-white shadow-md transform scale-105' :
-                                                        isToday ? 'border-2 border-[#5D4037] text-[#5D4037] bg-white' :
-                                                            isHoliday ? 'bg-red-50 text-red-400 border border-red-100' :
-                                                                'bg-white text-gray-700 hover:bg-gray-50 border border-transparent'}
-                                            ${isDisabled && isCurrentMonth ? 'opacity-30 cursor-not-allowed text-gray-400' : ''}
-                                            ${!isCurrentMonth ? 'opacity-0 pointer-events-none' : ''} 
-                                        `}
+                                            className={`h-10 w-full flex items-center justify-center rounded-2xl text-xs font-semibold transition-all relative ${
+                                                !isCurrentMonth ? 'opacity-0 pointer-events-none' : ''
+                                            } ${
+                                                isSelected
+                                                    ? 'bg-[#5d4037] text-white shadow-md shadow-[#5d4037]/25 scale-105 z-10'
+                                                    : isToday
+                                                        ? 'border-2 border-[#5d4037] text-[#5d4037] bg-[#5d4037]/5 font-bold'
+                                                        : isHoliday
+                                                            ? 'bg-rose-50 text-rose-500 border border-rose-100'
+                                                            : 'bg-transparent text-[#3e2723] hover:bg-[#faf8f5]'
+                                            } ${
+                                                isDisabled && isCurrentMonth ? 'opacity-30 cursor-not-allowed text-gray-400 hover:bg-transparent' : ''
+                                            }`}
                                             disabled={isDisabled}
                                         >
                                             {d.getDate()}
                                             {isHoliday && isCurrentMonth && (
-                                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
+                                                <span className="absolute bottom-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
                                             )}
                                         </button>
                                     );
@@ -428,12 +468,24 @@ function SelectDateTimeContent() {
                     </div>
                 </div>
 
-                {/* Available Time */}
-                <div className="w-full max-w-md mx-auto mt-6">
-                    <h2 className="text-base font-bold mb-3 text-gray-800 pl-1">เลือกช่วงเวลา</h2>
+                {/* Available Time Slots */}
+                <div className="w-full">
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <h2 className="text-sm font-bold text-[#3e2723] flex items-center gap-2">
+                            <svg className="w-4 h-4 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            เลือกรอบเวลาบริการ
+                        </h2>
+                        {date && (
+                            <span className="text-xs text-[#8d6e63]">
+                                {format(date, 'd MMM yyyy', { locale: th })}
+                            </span>
+                        )}
+                    </div>
 
                     {date && !isDateOpen(date) ? (
-                        <div className="text-center p-6 bg-red-50 border border-red-100 rounded-xl">
+                        <div className="text-center p-6 bg-rose-50/70 border border-rose-100 rounded-2xl">
                             {(() => {
                                 const dateStr = format(date, 'yyyy-MM-dd');
                                 const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
@@ -441,17 +493,17 @@ function SelectDateTimeContent() {
                                 if (holidayInfo) {
                                     return (
                                         <div>
-                                            <p className="text-red-600 font-medium">วันหยุดพิเศษ</p>
+                                            <p className="text-rose-600 font-bold text-sm">วันหยุดพิเศษ</p>
                                             {holidayInfo.note && (
-                                                <p className="text-red-500 text-sm mt-1">{holidayInfo.note}</p>
+                                                <p className="text-rose-500 text-xs mt-1">{holidayInfo.note}</p>
                                             )}
                                         </div>
                                     );
                                 } else {
-                                    return <p className="text-gray-600 font-medium">ร้านปิดทำการในวันนี้</p>;
+                                    return <p className="text-[#3e2723] font-medium text-sm">ร้านปิดทำการในวันนี้</p>;
                                 }
                             })()}
-                            <p className="text-sm text-gray-500 mt-1">กรุณาเลือกวันอื่น</p>
+                            <p className="text-xs text-[#8d6e63] mt-1.5">กรุณาเลือกวันอื่นสำหรับการนัดหมาย</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-4 gap-2">
@@ -465,19 +517,22 @@ function SelectDateTimeContent() {
                                     const isFull = booked >= max;
                                     const isOverlapping = unavailableSlots.has(slot);
                                     const isDisabled = isFull || isOverlapping;
+                                    const isSelected = time === slot;
+
                                     return (
                                         <button
                                             key={slot}
                                             onClick={() => !isDisabled && setTime(slot)}
-                                            className={`rounded-xl py-2 text-sm font-medium transition-all
-                                            ${time === slot
-                                                    ? 'bg-[#5D4037] text-white shadow-md transform scale-105'
-                                                    : 'bg-white text-gray-600 border border-gray-200 hover:border-[#5D4037] hover:text-[#5D4037]'}
-                                            ${isDisabled ? 'opacity-40 cursor-not-allowed bg-gray-50 border-transparent text-gray-400 decoration-slate-400' : ''}`}
                                             disabled={isDisabled}
-                                            style={isDisabled ? { textDecoration: 'line-through' } : {}}
+                                            className={`rounded-2xl py-2.5 text-xs font-semibold transition-all border ${
+                                                isSelected
+                                                    ? 'bg-[#5d4037] text-white border-[#5d4037] shadow-md shadow-[#5d4037]/20 scale-[1.02]'
+                                                    : isDisabled
+                                                        ? 'bg-gray-100/70 text-gray-400 border-gray-200/50 cursor-not-allowed line-through'
+                                                        : 'bg-white text-[#4a3429] border-[#e7e0da] hover:border-[#8d6e63] hover:bg-[#faf8f5]'
+                                            }`}
                                         >
-                                            {slot}
+                                            {slot} น.
                                         </button>
                                     );
                                 })}
@@ -486,16 +541,29 @@ function SelectDateTimeContent() {
                 </div>
 
                 {/* Technician Selection */}
-                {/* Only show if enabled in settings and a time is selected */}
                 {useTechnician && time && (
-                    <div className="w-full max-w-md mx-auto mt-6">
-                        <h2 className="text-base font-bold mb-3 text-gray-800 pl-1">เลือกช่าง (Optional)</h2>
+                    <div className="w-full">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <h2 className="text-sm font-bold text-[#3e2723] flex items-center gap-2">
+                                <svg className="w-4 h-4 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                เลือกผู้ให้บริการ
+                            </h2>
+                            <span className="text-xs text-[#8d6e63]">ระบุช่างที่ต้องการ</span>
+                        </div>
+
                         {loading ? (
-                            <div className="text-center py-4 text-gray-500">กำลังโหลดรายชื่อช่าง...</div>
+                            <div className="flex flex-col items-center justify-center py-6 text-xs text-[#8d6e63]">
+                                <SpaFlowerIcon className="w-8 h-8 animate-spin mb-2" color="#5d4037" />
+                                <span>กำลังโหลดรายชื่อผู้ให้บริการ...</span>
+                            </div>
                         ) : technicians.length === 0 ? (
-                            <div className="text-center text-gray-500 bg-gray-50 p-4 rounded-xl border border-gray-100">ไม่มีช่างที่พร้อมให้บริการ</div>
+                            <div className="text-center text-xs text-[#8d6e63] bg-white p-5 rounded-2xl border border-[#e7e0da]">
+                                ไม่มีผู้ให้บริการที่พร้อมในขณะนี้
+                            </div>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {technicians.map(technician => (
                                     <TechnicianCard
                                         key={technician.id}
@@ -511,15 +579,30 @@ function SelectDateTimeContent() {
                 )}
             </div>
 
-            {/* Confirm Button Fixed Bottom */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t h-20 z-50">
-                <div className="max-w-md mx-auto h-full px-4 flex items-center">
+            {/* Sticky Floating Bottom Bar */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] pb-[env(safe-area-inset-bottom,16px)] pt-3.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+                <div className="max-w-md mx-auto px-4 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-[#8d6e63] font-medium">เวลานัดหมายที่เลือก</div>
+                        {date && time ? (
+                            <div className="text-sm font-bold text-[#3e2723] truncate flex items-center gap-1.5 mt-0.5">
+                                <span>{format(date, 'd MMM yyyy', { locale: th })}</span>
+                                <span className="text-[#8d6e63]">•</span>
+                                <span className="text-[#5d4037]">{time} น.</span>
+                            </div>
+                        ) : (
+                            <div className="text-xs text-gray-400 mt-0.5">โปรดเลือกวันและเวลา</div>
+                        )}
+                    </div>
                     <button
                         onClick={handleConfirm}
                         disabled={!date || !time || (useTechnician && selectedTechnician == null)}
-                        className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white py-2.5 rounded-2xl font-bold text-base shadow-lg shadow-[#5D4037]/20 transition-all transform active:scale-95 disabled:bg-gray-300 disabled:shadow-none"
+                        className="bg-[#5d4037] hover:bg-[#4a3429] active:scale-[0.98] text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-md shadow-[#5d4037]/20 transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
                     >
-                        ถัดไป
+                        <span>ถัดไป</span>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -531,8 +614,8 @@ export default function SelectDateTimePage() {
     return (
         <Suspense
             fallback={
-                <div className="flex flex-col items-center justify-center min-h-screen">
-                    <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+                <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                    <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
                 </div>
             }
         >

@@ -89,6 +89,9 @@ export interface Appointment {
         duration?: number;
         addOns?: any[];
         technicianName?: string;
+        technicianInfo?: { firstName?: string; lastName?: string };
+        employeeId?: string;
+        technicianId?: string;
     };
     paymentInfo?: {
         basePrice?: number;

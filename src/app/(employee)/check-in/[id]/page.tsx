@@ -24,7 +24,12 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
     const [loading, setLoading] = useState(true);
     const [showQr, setShowQr] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
-    const [confirmModal, setConfirmModal] = useState<{ show: boolean, title: string, message: string, action: (() => Promise<void>) | null }>({ show: false, title: '', message: '', action: null });
+    const [confirmModal, setConfirmModal] = useState<{
+        show: boolean;
+        title: string;
+        message: string;
+        action: (() => Promise<void>) | null;
+    }>({ show: false, title: '', message: '', action: null });
 
     useEffect(() => {
         const fetchAppointment = async () => {
@@ -49,17 +54,15 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
         };
 
         fetchAppointment();
-    }, [id, router, showToast]);
+    }, [id, router, showToast, liff]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="min-h-screen bg-[#faf8f5] flex flex-col">
                 <EmployeeHeader showBackButton />
-                <div className="flex-1 flex items-center justify-center p-4">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                        <p className="text-gray-600">กำลังโหลดข้อมูล...</p>
-                    </div>
+                <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-3">
+                    <div className="w-10 h-10 border-2 border-[#d7ccc8] border-t-[#5d4037] rounded-full animate-spin" />
+                    <p className="text-xs font-medium text-[#8d6e63]">กำลังโหลดข้อมูลนัดหมาย...</p>
                 </div>
             </div>
         );
@@ -117,7 +120,6 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
             showToast('อัปเดตสถานะสำเร็จ!', 'success');
             setAppointment(prev => prev ? ({ ...prev, status: newStatus }) : null);
             if (newStatus === 'cancelled') {
-                // Optionally redirect back after cancel
                 setTimeout(() => router.back(), 1500);
             }
         } else {
@@ -129,8 +131,8 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
     const confirmPayment = () => {
         setConfirmModal({
             show: true,
-            title: "ยืนยันการชำระเงิน",
-            message: "ยืนยันว่าลูกค้าได้ชำระเงินครบถ้วนแล้วใช่หรือไม่?",
+            title: "ยืนยันการรับชำระเงิน",
+            message: `ยืนยันว่าได้รับเงินจำนวน ${appointment.paymentInfo?.totalPrice?.toLocaleString() || 0} ${storeProfile?.currencySymbol || 'บาท'} ครบถ้วนแล้วใช่หรือไม่?`,
             action: handleUpdatePayment
         });
     };
@@ -139,7 +141,7 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
         setConfirmModal({
             show: true,
             title: "ยืนยันเสร็จสิ้นบริการ",
-            message: "ต้องการบันทึกว่าการบริการนี้เสร็จสิ้นแล้วใช่หรือไม่?",
+            message: "บันทึกว่าการบริการลูกค้าครั้งนี้เสร็จสิ้นสมบูรณ์ใช่หรือไม่?",
             action: async () => handleStatusChange('completed')
         });
     };
@@ -147,178 +149,260 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
     const confirmCancel = () => {
         setConfirmModal({
             show: true,
-            title: "ยืนยันการยกเลิก",
+            title: "ยืนยันการยกเลิกนัดหมาย",
             message: "คุณต้องการยกเลิกนัดหมายนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้",
             action: async () => handleStatusChange('cancelled')
         });
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-safe">
+        <div className="min-h-screen bg-[#faf8f5] pb-10">
             <EmployeeHeader showBackButton />
 
-            <main className="p-4 space-y-4 max-w-lg mx-auto">
-                <div className="grid gap-4">
-                    {/* --- Appointment Info --- */}
-                    <div className="bg-white p-4 rounded-xl border border-gray-100">
-                        {/* Customer Info */}
-                        <div className="flex justify-between items-start mb-3">
-                            <div>
-                                <p className="font-bold text-lg text-gray-900">{appointment.customerInfo.fullName || appointment.customerInfo.name}</p>
-                                <p className="text-sm text-gray-500">{appointment.customerInfo.phone}</p>
-                            </div>
-                        </div>
-
-                        {/* Service Details */}
-                        <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                            <p className="font-semibold text-gray-800">{appointment.serviceInfo.name}</p>
-
-                            {/* Standard service - show base duration if available */}
-                            {(!appointment.serviceInfo?.serviceType || appointment.serviceInfo?.serviceType === 'standard') && (
-                                <div className="text-sm text-gray-600">
-                                    {appointment.appointmentInfo?.duration && (
-                                        <p>⏱ ระยะเวลา: {appointment.appointmentInfo.duration} นาที</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Multi-area service details */}
-                            {appointment.serviceInfo?.serviceType === 'multi-area' && (
-                                <div className="text-sm text-gray-600 space-y-1">
-                                    {appointment.serviceInfo?.selectedArea && (
-                                        <div className="flex items-center gap-1">
-                                            <span>📍</span>
-                                            <span>{appointment.serviceInfo.selectedArea.name}</span>
-                                        </div>
-                                    )}
-                                    {appointment.serviceInfo?.selectedPackage && (
-                                        <div className="flex justify-between items-center">
-                                            <span>📦 {appointment.serviceInfo.selectedPackage.name}</span>
-                                            <span className="text-gray-400">{appointment.serviceInfo.selectedPackage.duration} นาที</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Option-based service details */}
-                            {appointment.serviceInfo?.serviceType === 'option-based' && (
-                                <div className="text-sm text-gray-600 space-y-1">
-                                    {appointment.serviceInfo?.selectedOptionName && (
-                                        <div className="flex justify-between items-center">
-                                            <span>🏷️ {appointment.serviceInfo.selectedOptionName}</span>
-                                            {appointment.serviceInfo.selectedOptionDuration && (
-                                                <span className="text-gray-400">{appointment.serviceInfo.selectedOptionDuration} นาที/จุด</span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {appointment.serviceInfo?.selectedAreas && appointment.serviceInfo.selectedAreas.length > 0 && (
-                                        <div className="flex items-start gap-1">
-                                            <span>📍</span>
-                                            <span>{appointment.serviceInfo.selectedAreas.join(', ')} ({appointment.serviceInfo.selectedAreas.length} จุด)</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Area-based-options service details */}
-                            {appointment.serviceInfo?.serviceType === 'area-based-options' && appointment.serviceInfo?.selectedAreaOptions && appointment.serviceInfo.selectedAreaOptions.length > 0 && (
-                                <div className="text-sm text-gray-600 space-y-1">
-                                    {appointment.serviceInfo.selectedAreaOptions.map((opt: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between items-center">
-                                            <span>🔸 {opt.areaName} ({opt.optionName})</span>
-                                            <div className="text-gray-400 flex items-center gap-1 text-xs">
-                                                {opt.duration && <span>{opt.duration} นาที</span>}
-                                                {opt.duration && opt.price && <span>•</span>}
-                                                {opt.price && <span>{Number(opt.price).toLocaleString()} {storeProfile?.currencySymbol}</span>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Add-ons */}
-                            {appointment.appointmentInfo?.addOns && appointment.appointmentInfo.addOns.length > 0 && (
-                                <div className="border-t border-gray-200 pt-2 mt-2">
-                                    <p className="text-xs font-semibold text-blue-700 mb-1">บริการเสริม:</p>
-                                    <div className="text-sm text-blue-600 space-y-0.5">
-                                        {appointment.appointmentInfo.addOns.map((addon: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center">
-                                                <span>+ {addon.name}</span>
-                                                <div className="flex items-center gap-1 text-blue-400 text-xs">
-                                                    {addon.duration && <span>{addon.duration} นาที</span>}
-                                                    {addon.duration && addon.price && <span>•</span>}
-                                                    {addon.price && <span>{Number(addon.price).toLocaleString()} {storeProfile?.currencySymbol}</span>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Total Duration */}
-                            {appointment.appointmentInfo?.duration && (
-                                <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between items-center text-sm">
-                                    <span className="font-semibold text-gray-700">ระยะเวลารวม</span>
-                                    <span className="font-bold text-gray-900">{appointment.appointmentInfo.duration} นาที</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Date & Time */}
-                        <div className="mt-3 flex items-center justify-between text-sm">
-                            <div className="text-gray-600">
-                                {appointment.date && (
-                                    <span className="font-medium">{format(parseISO(appointment.date), 'dd MMMM yyyy', { locale: th })}</span>
-                                )}
-                            </div>
-                            <span className="font-bold text-gray-900 text-lg">{appointment.time} น.</span>
-                        </div>
-                    </div>
-
-                    {/* --- Payment Section --- */}
-                    <div className="bg-white p-4 rounded-lg">
-                        <h3 className="font-semibold text-md mb-3">การชำระเงิน</h3>
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="font-bold text-lg">{appointment.paymentInfo?.totalPrice?.toLocaleString()} {storeProfile?.currencySymbol}</span>
-                            <span className={`font-semibold px-3 py-1 rounded-full text-sm ${isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                {isPaid ? 'ชำระเงินแล้ว' : 'ยังไม่ชำระ'}
+            <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
+                {/* Header Strip */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-[#5d4037] bg-[#f5ede8] px-2.5 py-0.5 rounded-full border border-[#e8ddd7]">
+                                คิว #{appointment.id.slice(0, 6).toUpperCase()}
                             </span>
                         </div>
-                        {!isPaid && (
-                            <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => setShowQr(true)} disabled={isUpdating} className="w-full py-2 rounded-lg font-semibold btn-secondary">แสดง QR</button>
-                                <button onClick={confirmPayment} disabled={isUpdating} className="w-full py-2 rounded-lg font-semibold btn-primary">ยืนยันชำระเงิน</button>
-                            </div>
-                        )}
+                        <h1 className="text-xl font-bold tracking-tight text-[#3e2723] mt-1">
+                            จัดการคิวบริการ
+                        </h1>
                     </div>
+                </div>
 
-                    {/* --- Check-in Section --- */}
-                    <div className="bg-white p-4 rounded-lg">
-                        <h3 className="font-semibold text-md mb-3">การเข้ารับบริการ</h3>
-                        {isCheckedIn ? (
-                            <div className="text-center bg-green-50 p-4 rounded-lg border border-green-100">
-                                <div className="text-green-600 text-xl font-bold mb-1">✓ กำลังให้บริการ</div>
-                                <p className="text-green-800 text-sm">ลูกค้าเข้ารับบริการแล้ว</p>
+                {/* 1. Customer & Service Details Card */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e7e0da] shadow-2xs space-y-3.5">
+                    {/* Customer Info */}
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-2xl bg-[#f5ede8] border border-[#e7e0da] flex items-center justify-center text-[#5d4037] font-bold text-base shrink-0">
+                                {(appointment.customerInfo.fullName || appointment.customerInfo.name || 'ล').slice(0, 1)}
                             </div>
-                        ) : (
-                            <button onClick={handleCheckIn} disabled={isUpdating || !['pending', 'confirmed', 'awaiting_confirmation'].includes(appointment.status)} className="w-full py-3 rounded-lg font-bold text-lg btn-primary">
-                                ยืนยันการเข้ารับบริการ
-                            </button>
-                        )}
-                    </div>
-
-                    {/* --- Other Actions --- */}
-                    <div className="bg-white p-4 rounded-lg">
-                        <h3 className="font-semibold text-md mb-3">การดำเนินการอื่นๆ</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={confirmComplete} disabled={isUpdating || appointment.status === 'completed'} className="w-full py-2 rounded-lg font-semibold btn-secondary">เสร็จสิ้นบริการ</button>
-                            <button onClick={confirmCancel} disabled={isUpdating || appointment.status === 'cancelled'} className="w-full py-2 rounded-lg font-semibold btn-danger">ยกเลิกนัด</button>
+                            <div>
+                                <p className="font-bold text-base text-[#3e2723]">
+                                    {appointment.customerInfo.fullName || appointment.customerInfo.name || 'ไม่ระบุชื่อ'}
+                                </p>
+                                <p className="text-xs text-[#8d6e63] font-mono mt-0.5">
+                                    {appointment.customerInfo.phone || '-'}
+                                </p>
+                            </div>
                         </div>
+
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                            isPaid ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {isPaid ? 'ชำระแล้ว' : 'รอชำระ'}
+                        </span>
+                    </div>
+
+                    {/* Service Breakdown */}
+                    <div className="bg-[#faf8f5] p-3.5 rounded-xl border border-[#f0eae4] space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-[#5d4037]" />
+                                <p className="font-bold text-sm text-[#3e2723]">
+                                    {appointment.serviceInfo?.name || 'บริการสปา'}
+                                </p>
+                            </div>
+                            {appointment.appointmentInfo?.duration && (
+                                <span className="text-[11px] font-semibold text-[#8d6e63] bg-white px-2 py-0.5 rounded-md border border-[#e7e0da]">
+                                    {appointment.appointmentInfo.duration} นาที
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Multi-area service details */}
+                        {appointment.serviceInfo?.serviceType === 'multi-area' && (
+                            <div className="text-xs text-[#5d4037] space-y-1 pt-1.5 border-t border-[#e7e0da]/60">
+                                {appointment.serviceInfo?.selectedArea && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[#8d6e63]">บริเวณ:</span>
+                                        <span className="font-semibold">{appointment.serviceInfo.selectedArea.name}</span>
+                                    </div>
+                                )}
+                                {appointment.serviceInfo?.selectedPackage && (
+                                    <div className="flex justify-between items-center text-[11px]">
+                                        <span>แพ็กเกจ: {appointment.serviceInfo.selectedPackage.name}</span>
+                                        <span className="text-[#8d6e63]">{appointment.serviceInfo.selectedPackage.duration} นาที</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Option-based service details */}
+                        {appointment.serviceInfo?.serviceType === 'option-based' && (
+                            <div className="text-xs text-[#5d4037] space-y-1 pt-1.5 border-t border-[#e7e0da]/60">
+                                {appointment.serviceInfo?.selectedOptionName && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">ตัวเลือก: {appointment.serviceInfo.selectedOptionName}</span>
+                                        {appointment.serviceInfo.selectedOptionDuration && (
+                                            <span className="text-[11px] text-[#8d6e63]">{appointment.serviceInfo.selectedOptionDuration} นาที/จุด</span>
+                                        )}
+                                    </div>
+                                )}
+                                {appointment.serviceInfo?.selectedAreas && appointment.serviceInfo.selectedAreas.length > 0 && (
+                                    <p className="text-[11px] text-[#8d6e63]">
+                                        ตำแหน่ง: {appointment.serviceInfo.selectedAreas.join(', ')} ({appointment.serviceInfo.selectedAreas.length} จุด)
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Area-based-options service details */}
+                        {appointment.serviceInfo?.serviceType === 'area-based-options' && appointment.serviceInfo?.selectedAreaOptions && appointment.serviceInfo.selectedAreaOptions.length > 0 && (
+                            <div className="text-xs text-[#5d4037] space-y-1 pt-1.5 border-t border-[#e7e0da]/60">
+                                {appointment.serviceInfo.selectedAreaOptions.map((opt: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between items-center text-[11px]">
+                                        <span>• {opt.areaName} ({opt.optionName})</span>
+                                        <span className="text-[#8d6e63] font-mono">
+                                            {opt.duration} น. | {Number(opt.price).toLocaleString()} {storeProfile?.currencySymbol}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Add-ons */}
+                        {appointment.appointmentInfo?.addOns && appointment.appointmentInfo.addOns.length > 0 && (
+                            <div className="border-t border-[#e7e0da]/70 pt-2 space-y-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-[#5d4037]">บริการเสริม:</p>
+                                {appointment.appointmentInfo.addOns.map((addon: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs text-[#5d4037]">
+                                        <span>+ {addon.name}</span>
+                                        <span className="text-[11px] text-[#8d6e63] font-mono">
+                                            {addon.duration} น. | {Number(addon.price).toLocaleString()} {storeProfile?.currencySymbol}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Date & Time */}
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                        <div className="flex items-center gap-1.5 text-[#5d4037]">
+                            <svg className="w-4 h-4 text-[#8d6e63]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="font-medium">
+                                {appointment.date ? format(parseISO(appointment.date), 'dd MMMM yyyy', { locale: th }) : '-'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1 font-bold text-[#3e2723] bg-[#f5f2ed] px-2.5 py-1 rounded-lg border border-[#e7e0da]">
+                            <span>{appointment.time} น.</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. Payment Section */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e7e0da] shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8d6e63]">ยอดชำระบริการ</span>
+                            <div className="text-xl sm:text-2xl font-extrabold text-[#3e2723] font-mono mt-0.5">
+                                {appointment.paymentInfo?.totalPrice?.toLocaleString() || 0}{' '}
+                                <span className="text-xs font-bold text-[#8d6e63] font-sans">
+                                    {storeProfile?.currencySymbol || 'บาท'}
+                                </span>
+                            </div>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${
+                            isPaid ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {isPaid ? 'ชำระเงินเรียบร้อย' : 'รอรับชำระเงิน'}
+                        </span>
+                    </div>
+
+                    {!isPaid && (
+                        <div className="grid grid-cols-2 gap-2.5 pt-1">
+                            <button
+                                onClick={() => setShowQr(true)}
+                                disabled={isUpdating}
+                                className="h-11 rounded-xl bg-white hover:bg-[#faf8f5] text-[#5d4037] border border-[#d7ccc8] font-bold text-xs shadow-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5"
+                            >
+                                <svg className="w-4 h-4 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <span>แสดง QR Code</span>
+                            </button>
+                            <button
+                                onClick={confirmPayment}
+                                disabled={isUpdating}
+                                className="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.99] flex items-center justify-center gap-1.5"
+                            >
+                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span>ยืนยันรับเงินแล้ว</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* 3. Check-in Section */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e7e0da] shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#3e2723]">สถานะการเข้ารับบริการ</span>
+                    </div>
+
+                    {isCheckedIn ? (
+                        <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 text-center space-y-1">
+                            <div className="flex items-center justify-center gap-1.5 text-purple-800 font-bold text-sm">
+                                <span className="w-2 h-2 rounded-full bg-purple-600 animate-ping" />
+                                <span>กำลังให้บริการลูกค้าอยู่ในขณะนี้</span>
+                            </div>
+                            <p className="text-[11px] text-purple-600">
+                                เมื่อการให้บริการเสร็จสิ้น กรุณากดปุ่ม &quot;เสร็จสิ้นบริการ&quot; ด้านล่าง
+                            </p>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleCheckIn}
+                            disabled={isUpdating || !['pending', 'confirmed', 'awaiting_confirmation'].includes(appointment.status)}
+                            className="w-full h-12 rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-sm shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>ยืนยันการเช็คอิน / เริ่มให้บริการ</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* 4. Complete & Cancel Operations */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e7e0da] shadow-2xs space-y-3">
+                    <span className="text-xs font-bold text-[#3e2723] block">การดำเนินการขั้นตอนถัดไป</span>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                            onClick={confirmComplete}
+                            disabled={isUpdating || appointment.status === 'completed'}
+                            className="h-11 rounded-xl bg-[#4a3429] hover:bg-[#32231b] text-white font-bold text-xs shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                            <span>✓ เสร็จสิ้นบริการ</span>
+                        </button>
+                        <button
+                            onClick={confirmCancel}
+                            disabled={isUpdating || appointment.status === 'cancelled'}
+                            className="h-11 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-bold text-xs shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                            <span>ยกเลิกนัดหมาย</span>
+                        </button>
                     </div>
                 </div>
             </main>
 
-            <PaymentQrModal show={showQr} onClose={() => setShowQr(false)} appointment={appointment} profile={storeProfile} />
+            <PaymentQrModal
+                show={showQr}
+                onClose={() => setShowQr(false)}
+                appointment={appointment}
+                profile={storeProfile}
+            />
 
             <ConfirmationModal
                 show={confirmModal.show}

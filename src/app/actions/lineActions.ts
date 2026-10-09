@@ -21,7 +21,10 @@ export async function sendLineMessage(to: string, messageText: string, notificat
     }
 
     const { success, settings } = await getNotificationSettings();
-    if (!success || !settings?.customerNotifications?.[notificationType]) {
+    const allEnabled = settings?.allNotifications?.enabled !== false;
+    const customerGroupEnabled = allEnabled && (settings?.customerNotifications?.enabled !== false);
+
+    if (!success || !customerGroupEnabled || !settings?.customerNotifications?.[notificationType]) {
         console.log(`Customer notification for type '${notificationType}' is disabled.`);
         return { success: true, message: "Customer notifications disabled for this type." };
     }
@@ -164,9 +167,11 @@ export async function sendBookingNotification(details: any, type: string) {
 export async function sendReminderNotification(customerLineId: string, bookingData: any) {
     // 1. Check settings first
     const { success, settings } = await getNotificationSettings();
-    const notificationType = 'appointmentReminder'; // Make sure this key matches your settings structure
+    const notificationType = 'appointmentReminder';
+    const allEnabled = settings?.allNotifications?.enabled !== false;
+    const customerGroupEnabled = allEnabled && (settings?.customerNotifications?.enabled !== false);
 
-    if (!success || !settings?.customerNotifications?.[notificationType]) {
+    if (!success || !customerGroupEnabled || !settings?.customerNotifications?.[notificationType]) {
         console.log(`Customer notification for type '${notificationType}' is disabled.`);
         return { success: true, message: `Customer notifications for '${notificationType}' are disabled.` };
     }
@@ -180,4 +185,102 @@ export async function sendReminderNotification(customerLineId: string, bookingDa
     // But here we will try to use the imported function.
 
     return sendReminderFlex(customerLineId, bookingData);
+}
+
+/**
+ * ตรวจสอบการเชื่อมต่อ LINE Messaging API ด้วย Channel Access Token พร้อมข้อมูลโควต้า
+ */
+export async function testLineConnection(customToken?: string): Promise<{
+    success: boolean;
+    botName?: string;
+    basicId?: string;
+    pictureUrl?: string;
+    quota?: {
+        type: string;
+        limit: number | null;
+        used: number | null;
+        remaining: number | null;
+    };
+    error?: string;
+}> {
+    try {
+        let token = customToken?.trim();
+        if (!token) {
+            token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+            if (!token || token === 'placeholder_channel_access_token') {
+                const { settings } = await getNotificationSettings();
+                token = settings?.lineNotifications?.channelAccessToken?.trim();
+            }
+        }
+        if (!token || token === 'placeholder_channel_access_token') {
+            return { success: false, error: 'ยังไม่ได้ระบุ Channel Access Token' };
+        }
+
+        // 1. ดึงข้อมูล Profile ของ Bot
+        const res = await fetch('https://api.line.me/v2/bot/info', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            return {
+                success: false,
+                error: data.message || `LINE API Error (${res.status})`
+            };
+        }
+
+        // 2. ดึงโควต้าข้อความสูงสุดประจำเดือน (Quota Limit)
+        let quotaType = 'none';
+        let quotaLimit: number | null = null;
+        try {
+            const quotaRes = await fetch('https://api.line.me/v2/bot/message/quota', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (quotaRes.ok) {
+                const qData = await quotaRes.json();
+                quotaType = qData.type || 'none';
+                quotaLimit = typeof qData.value === 'number' ? qData.value : null;
+            }
+        } catch (e) {
+            console.error("Failed to fetch LINE quota limit:", e);
+        }
+
+        // 3. ดึงจำนวนข้อความที่ใช้ไปแล้วในเดือนนี้ (Quota Consumption)
+        let totalUsage: number | null = null;
+        try {
+            const usageRes = await fetch('https://api.line.me/v2/bot/message/quota/consumption', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (usageRes.ok) {
+                const uData = await usageRes.json();
+                totalUsage = typeof uData.totalUsage === 'number' ? uData.totalUsage : 0;
+            }
+        } catch (e) {
+            console.error("Failed to fetch LINE quota usage:", e);
+        }
+
+        const remaining = (quotaLimit !== null && totalUsage !== null)
+            ? Math.max(0, quotaLimit - totalUsage)
+            : null;
+
+        return {
+            success: true,
+            botName: data.displayName,
+            basicId: data.basicId,
+            pictureUrl: data.pictureUrl,
+            quota: {
+                type: quotaType,
+                limit: quotaLimit,
+                used: totalUsage,
+                remaining: remaining
+            }
+        };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'ไม่สามารถเชื่อมต่อ LINE API ได้' };
+    }
 }

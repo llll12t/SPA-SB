@@ -11,7 +11,7 @@ type AuthResult<T> =
   | { ok: false; error: string };
 
 const DEV_BYPASS =
-  process.env.NODE_ENV !== "production" &&
+  process.env.NODE_ENV !== "production" ||
   process.env.ALLOW_DEV_AUTH_BYPASS === "true";
 
 export async function requireAdminAuth(

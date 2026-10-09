@@ -12,9 +12,16 @@ export interface ShopProfile {
 }
 
 export interface NotificationSettings {
+    allNotifications?: {
+        enabled?: boolean;
+    };
     lineNotifications?: {
         enabled?: boolean;
         notifyToken?: string;
+        channelAccessToken?: string;
+        channelSecret?: string;
+        liffId?: string;
+        [key: string]: any;
     };
     customerNotifications?: {
         newBooking?: boolean;
@@ -24,13 +31,21 @@ export interface NotificationSettings {
         appointmentCancelled?: boolean;
         paymentInvoice?: boolean;
         appointmentReminder?: boolean;
+        dailyAppointmentNotification?: boolean;
         [key: string]: boolean | undefined;
     };
     adminNotifications?: {
+        enabled?: boolean;
         newBooking?: boolean;
         paymentReceived?: boolean;
         customerConfirmed?: boolean;
-        telegram?: { enabled: boolean };
+        bookingCancelled?: boolean;
+        telegram?: {
+            enabled?: boolean;
+            botToken?: string;
+            chatId?: string;
+            [key: string]: any;
+        };
         [key: string]: any;
     };
     [key: string]: any;
@@ -248,3 +263,35 @@ export async function getPaymentSettings(auth?: AuthContext) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getSystemSettings(): Promise<{ success: boolean; settings?: any; error?: string }> {
+    if (!db) return { success: false, error: "Database is not initialized." };
+    try {
+        const docRef = db.collection('settings').doc('system');
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+            return { success: true, settings: makeSerializable(docSnap.data()) };
+        } else {
+            return { success: true, settings: {} };
+        }
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function saveSystemSettings(settingsData: any, auth?: AuthContext) {
+    if (!db) return { success: false, error: "Database is not initialized." };
+    try {
+        const adminAuth = await requireAdminAuth(auth);
+        if (!adminAuth.ok) return { success: false, error: adminAuth.error };
+
+        await db.collection('settings').doc('system').set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+

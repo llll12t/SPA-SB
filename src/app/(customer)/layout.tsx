@@ -36,7 +36,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
             <LiffProvider liffId={customerLiffId}>
                 <ProfileProvider>
                     <div
-                        className="min-h-screen relative overflow-hidden"
+                        className="min-h-screen relative overflow-x-clip"
                         style={{ background: 'linear-gradient(to bottom, #f5f0eb 0%, #fdfbf7 30%, #ffffff 100%)' }}
                     >
                         <div className="fixed top-[-30px] right-[-30px] opacity-[0.06] pointer-events-none z-0">

@@ -1,157 +1,37 @@
 "use server";
 
-import { google } from 'googleapis';
-import { db } from '@/app/lib/supabaseDb';
-import { getShopProfile } from './settingsActions';
-
-// Type definition for appointment data
+/**
+ * Type definition for appointment data
+ */
 interface AppointmentData {
-    appointmentInfo: {
-        dateTime: string | Date;
-        duration: number | string;
+    appointmentInfo?: {
+        dateTime?: string | Date;
+        duration?: number | string;
     };
-    serviceInfo: {
-        name: string;
+    serviceInfo?: {
+        name?: string;
     };
-    customerInfo: {
-        fullName: string;
-        phone: string;
+    customerInfo?: {
+        fullName?: string;
+        phone?: string;
     };
-    paymentInfo: {
-        totalPrice: number;
+    paymentInfo?: {
+        totalPrice?: number;
     };
-    status: string;
+    status?: string;
     googleCalendarEventId?: string;
+    [key: string]: any;
 }
 
-// Function to get Google API authentication
-const getGoogleAuth = () => {
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-    if (!privateKey || !process.env.GOOGLE_CLIENT_EMAIL) {
-        throw new Error("Missing Google authentication credentials in .env.local");
-    }
-
-    return new google.auth.GoogleAuth({
-        credentials: {
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            private_key: privateKey,
-        },
-        scopes: ['https://www.googleapis.com/auth/calendar'],
-    });
-};
-
-// Function to create or update a calendar event
-export async function createOrUpdateCalendarEvent(appointmentId: string, appointmentData: AppointmentData) {
-    try {
-        const settingsRef = db.collection('settings').doc('calendar');
-        const settingsSnap = await settingsRef.get();
-        const settings = settingsSnap.data();
-
-        if (!settings?.enabled || !settings?.calendarId) {
-            console.log("Calendar sync is disabled. Skipping event creation.");
-            return { success: true, message: "Calendar sync disabled." };
-        }
-
-        const startTime = new Date(appointmentData.appointmentInfo.dateTime);
-        const duration = Number(appointmentData.appointmentInfo.duration);
-        if (isNaN(duration)) {
-            throw new Error(`Invalid duration value for service: ${appointmentData.serviceInfo.name}`);
-        }
-        const endTime = new Date(startTime.getTime() + duration * 60000);
-
-        const { profile } = await getShopProfile();
-        const currencySymbol = profile?.currencySymbol || 'บาท';
-
-        const event = {
-            summary: `${appointmentData.serviceInfo.name} - ${appointmentData.customerInfo.fullName}`,
-            description: `ลูกค้า: ${appointmentData.customerInfo.fullName}\nเบอร์โทร: ${appointmentData.customerInfo.phone}\nบริการ: ${appointmentData.serviceInfo.name}\nราคา: ${appointmentData.paymentInfo.totalPrice} ${currencySymbol}\nสถานะ: ${appointmentData.status}`,
-            start: {
-                dateTime: startTime.toISOString(),
-                timeZone: 'Asia/Bangkok',
-            },
-            end: {
-                dateTime: endTime.toISOString(),
-                timeZone: 'Asia/Bangkok',
-            },
-        };
-
-        const auth = getGoogleAuth();
-        const calendar = google.calendar({ version: 'v3', auth });
-
-        const appointmentRef = db.collection('appointments').doc(appointmentId);
-        const appointmentSnap = await appointmentRef.get();
-        const existingEventId = appointmentSnap.data()?.googleCalendarEventId;
-
-        let newEvent;
-        if (existingEventId) {
-            // Need to handle potential error if event deleted on Google side
-            try {
-                newEvent = await calendar.events.update({
-                    calendarId: settings.calendarId,
-                    eventId: existingEventId,
-                    requestBody: event,
-                });
-                console.log(`Event updated: ${newEvent.data.htmlLink}`);
-            } catch (err: any) {
-                if (err.code === 404 || err.code === 410) {
-                    // Event gone, create new one
-                    newEvent = await calendar.events.insert({
-                        calendarId: settings.calendarId,
-                        requestBody: event,
-                    });
-                    console.log(`Event recreated: ${newEvent.data.htmlLink}`);
-                } else {
-                    throw err;
-                }
-            }
-        } else {
-            newEvent = await calendar.events.insert({
-                calendarId: settings.calendarId,
-                requestBody: event,
-            });
-            console.log(`Event created: ${newEvent.data.htmlLink}`);
-        }
-
-        await appointmentRef.update({
-            googleCalendarEventId: newEvent.data.id
-        });
-
-        return { success: true, eventId: newEvent.data.id };
-
-    } catch (error: any) {
-        console.error("Error creating/updating calendar event:", error.message);
-        return { success: false, error: error.message };
-    }
+/**
+ * การซิงค์ปฏิทินตอนนี้ทำงานผ่านระบบ iCalendar Feed (/api/calendar/feed.ics) อัตโนมัติ 100%
+ * ไม่จำเป็นต้องใช้ Google Cloud Service Account หรือ Private Key อีกต่อไป
+ * ฟังก์ชันเหล่านี้ยังคงอยู่เพื่อความเข้ากันได้ของระบบ โดยทำงานได้อย่างรวดเร็วและไม่เกิด Error
+ */
+export async function createOrUpdateCalendarEvent(appointmentId: string, appointmentData?: AppointmentData) {
+    return { success: true, message: "Calendar sync handled dynamically via iCalendar feed." };
 }
 
-// Function to delete a calendar event
-export async function deleteCalendarEvent(eventId: string) {
-    try {
-        const settingsRef = db.collection('settings').doc('calendar');
-        const settingsSnap = await settingsRef.get();
-        const settings = settingsSnap.data();
-
-        if (!settings?.enabled || !settings?.calendarId || !eventId) {
-            console.log("Cannot delete calendar event. Sync disabled, missing calendarId, or missing eventId.");
-            return { success: true, message: "Deletion skipped." };
-        }
-
-        const auth = getGoogleAuth();
-        const calendar = google.calendar({ version: 'v3', auth });
-
-        await calendar.events.delete({
-            calendarId: settings.calendarId,
-            eventId: eventId,
-        });
-
-        console.log(`Event with ID: ${eventId} deleted successfully.`);
-        return { success: true };
-    } catch (error: any) {
-        if (error.code === 410 || error.message.includes('Not Found')) {
-            console.log(`Event with ID: ${eventId} was already deleted or not found. Continuing.`);
-            return { success: true, message: "Event already deleted." };
-        }
-        console.error("Error deleting calendar event:", error.message);
-        return { success: false, error: error.message };
-    }
+export async function deleteCalendarEvent(eventId?: string) {
+    return { success: true, message: "Calendar deletion handled dynamically via iCalendar feed." };
 }

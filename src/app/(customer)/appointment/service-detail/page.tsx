@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { db, doc, getDoc } from '@/app/lib/supabaseDb';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useProfile } from '@/context/ProfileProvider';
-import { Service, AddOnService, ServiceOption, AreaOption } from '@/types';
+import { Service, AddOnService } from '@/types';
 import SpaFlowerIcon from '@/app/components/common/SpaFlowerIcon';
 
 // --- Add-on Card Component ---
@@ -20,15 +20,25 @@ const AddOnCard: React.FC<AddOnCardProps> = ({ addOn, isSelected, onToggle }) =>
     return (
         <div
             onClick={() => onToggle(addOn)}
-            className={`p-3 rounded-2xl flex items-center justify-between cursor-pointer transition-all text-sm shadow-sm ${isSelected ? 'bg-green-50 ring-2 ring-green-300' : 'bg-white hover:shadow-md'}`}
+            className={`p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition-all border text-xs sm:text-sm ${
+                isSelected
+                    ? 'bg-[#f5ede8] border-[#5d4037] shadow-xs'
+                    : 'bg-white border-[#e7e0da] hover:border-[#d7ccc8]'
+            }`}
         >
-            <div className="flex items-center w-full">
-                <span className="font-semibold text-gray-800 flex-1">{addOn.name}</span>
-                <span className="text-xs text-gray-700 ml-2 whitespace-nowrap">{addOn.duration} นาที | {profile.currencySymbol || '฿'}{addOn.price?.toLocaleString()}</span>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center ml-2 ${isSelected ? 'bg-[#5D4037]' : 'border'}`}>
+            <div className="flex items-center w-full min-w-0">
+                <span className="font-bold text-[#3e2723] flex-1 truncate">{addOn.name}</span>
+                <span className="text-xs text-[#8d6e63] ml-2 whitespace-nowrap font-mono">
+                    {addOn.duration} น. | {Number(addOn.price || 0).toLocaleString()} {profile.currencySymbol || '฿'}
+                </span>
+                <div
+                    className={`w-5 h-5 rounded-lg flex items-center justify-center ml-2.5 shrink-0 transition-all ${
+                        isSelected ? 'bg-[#5d4037] text-white' : 'border border-[#d7ccc8] bg-white'
+                    }`}
+                >
                     {isSelected && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
                         </svg>
                     )}
                 </div>
@@ -50,7 +60,6 @@ function ServiceDetailContent() {
     const [selectedTargetAreas, setSelectedTargetAreas] = useState<string[]>([]);
 
     // Area-Based-Options States
-    // Mapping: { areaName: optionIndex }
     const [selectedAreaOptions, setSelectedAreaOptions] = useState<Record<string, number>>({});
     const [expandedArea, setExpandedArea] = useState<string | null>(null);
 
@@ -82,7 +91,7 @@ function ServiceDetailContent() {
                     router.push('/appointment');
                 }
             } catch (error) {
-                console.error("Error fetching service:", error);
+                console.error('Error fetching service:', error);
                 router.push('/appointment');
             } finally {
                 setLoading(false);
@@ -92,10 +101,10 @@ function ServiceDetailContent() {
     }, [serviceId, router]);
 
     const toggleAddOn = (addOn: AddOnService) => {
-        setSelectedAddOns(prev => {
-            const isAlreadySelected = prev.some(item => item.name === addOn.name);
+        setSelectedAddOns((prev) => {
+            const isAlreadySelected = prev.some((item) => item.name === addOn.name);
             if (isAlreadySelected) {
-                return prev.filter(item => item.name !== addOn.name);
+                return prev.filter((item) => item.name !== addOn.name);
             } else {
                 return [...prev, addOn];
             }
@@ -103,21 +112,19 @@ function ServiceDetailContent() {
     };
 
     const toggleTargetArea = (areaName: string) => {
-        setSelectedTargetAreas(prev => {
+        setSelectedTargetAreas((prev) => {
             if (prev.includes(areaName)) {
-                return prev.filter(a => a !== areaName);
+                return prev.filter((a) => a !== areaName);
             } else {
                 return [...prev, areaName];
             }
         });
     };
 
-    // Area-Based-Options Handlers
     const handleAreaOptionSelect = (areaName: string, optionIndex: number) => {
-        setSelectedAreaOptions(prev => {
+        setSelectedAreaOptions((prev) => {
             const current = prev[areaName];
             if (current === optionIndex) {
-                // Deselect if clicking the same one
                 const newState = { ...prev };
                 delete newState[areaName];
                 return newState;
@@ -127,27 +134,30 @@ function ServiceDetailContent() {
     };
 
     const toggleAreaExpand = (areaName: string) => {
-        setExpandedArea(prev => prev === areaName ? null : areaName);
+        setExpandedArea((prev) => (prev === areaName ? null : areaName));
     };
 
-    // --- คำนวณราคา ---
+    // Calculate Price
     const totalPrice = useMemo(() => {
         let basePrice = 0;
 
         if (service?.serviceType === 'option-based') {
             if (selectedOptionIndex !== null && service.serviceOptions?.[selectedOptionIndex]) {
                 const optionPrice = service.serviceOptions[selectedOptionIndex].price;
-                // สูตร: ราคา Option x จำนวนจุดที่เลือก (ถ้าไม่เลือกจุดเลย ให้คิดราคา 1 จุดไปก่อนเพื่อโชว์)
-                const multiplier = Math.max(1, selectedTargetAreas.length);
+                const multiplier = selectedTargetAreas.length > 0 ? selectedTargetAreas.length : 1;
                 basePrice = optionPrice * multiplier;
+            } else {
+                basePrice = service.price || 0;
             }
         } else if (service?.serviceType === 'area-based-options') {
-            Object.entries(selectedAreaOptions).forEach(([areaName, optIdx]) => {
-                const areaGroup = service.areaOptions?.find(g => g.areaName === areaName);
-                if (areaGroup && areaGroup.options[optIdx]) {
-                    basePrice += Number(areaGroup.options[optIdx].price) || 0;
-                }
-            });
+            if (service.areaOptions) {
+                Object.entries(selectedAreaOptions).forEach(([areaName, optionIdx]) => {
+                    const group = service.areaOptions?.find((g) => g.areaName === areaName);
+                    if (group && group.options?.[optionIdx]) {
+                        basePrice += group.options[optionIdx].price || 0;
+                    }
+                });
+            }
         } else {
             basePrice = service?.price || 0;
         }
@@ -156,24 +166,27 @@ function ServiceDetailContent() {
         return basePrice + addOnsPrice;
     }, [service, selectedAddOns, selectedOptionIndex, selectedTargetAreas, selectedAreaOptions]);
 
-    // --- คำนวณเวลา ---
+    // Calculate Duration
     const totalDuration = useMemo(() => {
         let baseDuration = 0;
 
         if (service?.serviceType === 'option-based') {
             if (selectedOptionIndex !== null && service.serviceOptions?.[selectedOptionIndex]) {
                 const optionDuration = service.serviceOptions[selectedOptionIndex].duration;
-                // สูตร: เวลา Option x จำนวนจุดที่เลือก
-                const multiplier = Math.max(1, selectedTargetAreas.length);
+                const multiplier = selectedTargetAreas.length > 0 ? selectedTargetAreas.length : 1;
                 baseDuration = optionDuration * multiplier;
+            } else {
+                baseDuration = service.duration || 0;
             }
         } else if (service?.serviceType === 'area-based-options') {
-            Object.entries(selectedAreaOptions).forEach(([areaName, optIdx]) => {
-                const areaGroup = service.areaOptions?.find(g => g.areaName === areaName);
-                if (areaGroup && areaGroup.options[optIdx]) {
-                    baseDuration += Number(areaGroup.options[optIdx].duration) || 0;
-                }
-            });
+            if (service.areaOptions) {
+                Object.entries(selectedAreaOptions).forEach(([areaName, optionIdx]) => {
+                    const group = service.areaOptions?.find((g) => g.areaName === areaName);
+                    if (group && group.options?.[optionIdx]) {
+                        baseDuration += group.options[optionIdx].duration || 0;
+                    }
+                });
+            }
         } else {
             baseDuration = service?.duration || 0;
         }
@@ -181,7 +194,6 @@ function ServiceDetailContent() {
         const addOnsDuration = selectedAddOns.reduce((total, addOn) => total + (addOn.duration || 0), 0);
         return baseDuration + addOnsDuration;
     }, [service, selectedAddOns, selectedOptionIndex, selectedTargetAreas, selectedAreaOptions]);
-
 
     const handleConfirm = () => {
         if (!service) return;
@@ -213,209 +225,236 @@ function ServiceDetailContent() {
         }
 
         if (selectedAddOns.length > 0) {
-            params.set('addOns', selectedAddOns.map(a => a.name).join(','));
+            params.set('addOns', selectedAddOns.map((a) => a.name).join(','));
         }
         router.push(`/appointment/select-date-time?${params.toString()}`);
     };
 
     if (loading || profileLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+            <div className="flex flex-col items-center justify-center min-h-[80vh] space-y-3">
+                <SpaFlowerIcon className="w-12 h-12 animate-spin text-[#5d4037]" style={{ animationDuration: '3s' }} />
+                <p className="text-xs font-medium text-[#8d6e63]">กำลังโหลดข้อมูลบริการ...</p>
             </div>
         );
     }
     if (!service) return null;
 
     return (
-        <div>
+        <div className="min-h-screen bg-[#faf8f5] pb-28">
             <CustomerHeader showBackButton={true} showActionButtons={false} backUrl="/appointment" />
 
-            <div className="px-6 py-2 pb-32">
-                {/* Header Image & Title */}
-                <div className="flex flex-col gap-3 mb-4">
-                    <div className="relative w-full h-48 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
-                        {service.imageUrl ? (
-                            <img
-                                src={service.imageUrl}
-                                alt={service.serviceName}
-                                className="object-cover w-full h-full"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
-                                No Image
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                        <div className="absolute bottom-4 left-4 text-white">
-                            <h1 className="text-xl font-bold leading-tight shadow-md">{service.serviceName}</h1>
+            <div className="px-4.5 py-4 space-y-4">
+                {/* Hero Service Image Card */}
+                <div className="relative w-full aspect-16/9 rounded-3xl overflow-hidden shadow-md bg-[#2a1a10]">
+                    {service.imageUrl ? (
+                        <img
+                            src={service.imageUrl}
+                            alt={service.serviceName || service.name}
+                            className="object-cover w-full h-full"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-[#8d6e63] bg-[#f5ede8]">
+                            <SpaFlowerIcon className="w-12 h-12 opacity-40 mb-1" />
+                            <span className="text-xs font-semibold">ไม่มีรูปภาพ</span>
                         </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4 text-white">
+                        <div className="flex items-center gap-2 mb-1">
+                            {service.category && (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 backdrop-blur-xs text-white">
+                                    {service.category}
+                                </span>
+                            )}
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#5d4037]/80 backdrop-blur-xs text-white">
+                                ⏱ {service.duration || 60} นาที
+                            </span>
+                        </div>
+                        <h1 className="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm">
+                            {service.serviceName || service.name}
+                        </h1>
                     </div>
                 </div>
 
                 {/* Option-Based UI */}
-                <div className="mb-2">
-                    {service.serviceType === 'option-based' && (
-                        <div className="mb-6 space-y-6">
-                            {/* 1. เลือกตำแหน่ง (Checkbox) */}
-                            <div>
-                                <h2 className="text-sm font-semibold mb-2 text-gray-700 flex items-center justify-between">
-                                    เลือกตำแหน่ง
-                                    {selectedTargetAreas.length > 0 && <span className="text-xs font-normal text-white bg-[#5D4037] px-2 py-0.5 rounded-full">เลือก {selectedTargetAreas.length} จุด</span>}
+                {service.serviceType === 'option-based' && (
+                    <div className="bg-white p-4.5 rounded-3xl border border-[#e7e0da] shadow-2xs space-y-4">
+                        {/* 1. Select Target Areas */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2.5">
+                                <h2 className="text-xs font-bold text-[#3e2723] uppercase tracking-wider">
+                                    1. เลือกตำแหน่งที่ต้องการดูแล
                                 </h2>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {service.selectableAreas?.map((areaName, idx) => {
-                                        const isSelected = selectedTargetAreas.includes(areaName);
+                                {selectedTargetAreas.length > 0 && (
+                                    <span className="text-[11px] font-bold text-[#5d4037] bg-[#f5ede8] px-2.5 py-0.5 rounded-full border border-[#e8ddd7]">
+                                        เลือก {selectedTargetAreas.length} จุด
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {service.selectableAreas?.map((areaName, idx) => {
+                                    const isSelected = selectedTargetAreas.includes(areaName);
+                                    return (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => toggleTargetArea(areaName)}
+                                            className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-xs h-18 text-center border ${
+                                                isSelected
+                                                    ? 'bg-[#f5ede8] border-[#5d4037] text-[#3e2723] font-bold shadow-xs'
+                                                    : 'bg-white border-[#e7e0da] text-[#5d4037] hover:bg-[#faf8f5]'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-3.5 h-3.5 rounded-md flex items-center justify-center shrink-0 border ${
+                                                    isSelected ? 'bg-[#5d4037] border-[#5d4037] text-white' : 'border-[#d7ccc8] bg-white'
+                                                }`}
+                                            >
+                                                {isSelected && (
+                                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <span className="leading-tight truncate max-w-full">{areaName}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 2. Select Package (Radio) */}
+                        {selectedTargetAreas.length > 0 && (
+                            <div className="pt-2 border-t border-[#f0eae4] space-y-2.5">
+                                <h2 className="text-xs font-bold text-[#3e2723] uppercase tracking-wider">
+                                    2. เลือกแพ็คเกจบริการ (ราคาต่อจุด)
+                                </h2>
+                                <div className="space-y-2">
+                                    {service.serviceOptions?.map((opt, idx) => {
+                                        const isSelected = selectedOptionIndex === idx;
                                         return (
                                             <div
                                                 key={idx}
-                                                onClick={() => toggleTargetArea(areaName)}
-                                                className={`p-2 rounded-2xl flex flex-col items-center justify-center gap-1 cursor-pointer transition-all text-xs h-16 text-center shadow-sm ${isSelected ? 'bg-green-50 ring-2 ring-[#5D4037]' : 'bg-white hover:shadow-md'}`}
+                                                onClick={() => setSelectedOptionIndex(idx)}
+                                                className={`p-3 rounded-2xl flex items-center justify-between cursor-pointer transition-all border text-xs sm:text-sm ${
+                                                    isSelected
+                                                        ? 'bg-[#f5ede8] border-[#5d4037] shadow-xs'
+                                                        : 'bg-white border-[#e7e0da] hover:bg-[#faf8f5]'
+                                                }`}
                                             >
-                                                <div className={`w-3 h-3 rounded-md border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#5D4037] border-[#5D4037]' : 'border-gray-300 bg-white'}`}>
-                                                    {isSelected && <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                                                <div className="flex items-center gap-2.5 w-full">
+                                                    <div
+                                                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                                            isSelected ? 'border-[#5d4037]' : 'border-[#d7ccc8]'
+                                                        }`}
+                                                    >
+                                                        {isSelected && <div className="w-2 h-2 rounded-full bg-[#5d4037]" />}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="font-bold text-[#3e2723]">{opt.name}</div>
+                                                        <div className="text-[11px] text-[#8d6e63]">{opt.duration} นาที/จุด</div>
+                                                    </div>
+                                                    <div className="font-extrabold text-sm text-[#3e2723] font-mono">
+                                                        {Number(opt.price).toLocaleString()} {profile.currencySymbol || '฿'}
+                                                    </div>
                                                 </div>
-                                                <span className={`leading-tight ${isSelected ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{areaName}</span>
                                             </div>
                                         );
                                     })}
                                 </div>
                             </div>
-
-                            {/* 2. เลือกแพ็คเกจ (Radio) - Show only if areas selected */}
-                            {selectedTargetAreas.length > 0 && (
-                                <div className="animate-fade-in-up">
-                                    <h2 className="text-sm font-semibold mb-2 text-gray-700">เลือกแพ็คเกจ (ราคาต่อจุด)</h2>
-                                    <div className="space-y-2">
-                                        {service.serviceOptions?.map((opt, idx) => {
-                                            const isSelected = selectedOptionIndex === idx;
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => setSelectedOptionIndex(idx)}
-                                                    className={`p-2 rounded-2xl flex items-center justify-between cursor-pointer transition-all text-sm shadow-sm ${isSelected ? 'bg-green-50 ring-2 ring-[#5D4037]' : 'bg-white hover:shadow-md'}`}
-                                                >
-                                                    <div className="flex items-center gap-2 w-full">
-                                                        <div className={`w-3 h-3 rounded-full border flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-[#5D4037]' : 'border-gray-400'}`}>
-                                                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#5D4037]"></div>}
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <div className={`font-medium text-xs ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{opt.name}</div>
-                                                            <div className="text-[10px] text-gray-500">{opt.duration} นาที/จุด</div>
-                                                        </div>
-                                                        <div className="font-bold text-xs text-[#5D4037]">
-                                                            {profile.currencySymbol || '฿'}{opt.price.toLocaleString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Area-Based-Options UI (Compact Accordion) */}
-                    {service.serviceType === 'area-based-options' && (
-                        <div className="mb-6 space-y-2">
-                            <h2 className="text-sm font-semibold mb-2 text-gray-700">เลือกพื้นที่และบริการ</h2>
-                            {service.areaOptions?.map((areaGroup, areaIdx) => {
-                                const isExpanded = expandedArea === areaGroup.areaName;
-                                const selectedOptIdx = selectedAreaOptions[areaGroup.areaName];
-                                const selectedOpt = selectedOptIdx !== undefined ? areaGroup.options[selectedOptIdx] : null;
-
-                                return (
-                                    <div key={areaIdx} className={`rounded-2xl overflow-hidden transition-all shadow-sm ${isExpanded ? 'ring-2 ring-[#5D4037]' : ''}`}>
-                                        {/* Header */}
-                                        <div
-                                            onClick={() => toggleAreaExpand(areaGroup.areaName)}
-                                            className={`p-3 flex items-center justify-between cursor-pointer bg-gray-50 ${selectedOpt ? 'bg-green-50' : ''}`}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-gray-800">{areaGroup.areaName}</span>
-                                                {selectedOpt && (
-                                                    <span className="text-xs text-[#5D4037] font-medium">
-                                                        {selectedOpt.name} ({profile.currencySymbol || '฿'}{Number(selectedOpt.price).toLocaleString()})
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-gray-400">
-                                                {isExpanded ? '▲' : '▼'}
-                                            </div>
-                                        </div>
-
-                                        {/* Options Body */}
-                                        {isExpanded && (
-                                            <div className="p-2 bg-white border-t border-gray-100 grid grid-cols-1 gap-2">
-                                                {areaGroup.options?.map((opt, optIdx) => {
-                                                    const isSelected = selectedOptIdx === optIdx;
-                                                    return (
-                                                        <div
-                                                            key={optIdx}
-                                                            onClick={() => handleAreaOptionSelect(areaGroup.areaName, optIdx)}
-                                                            className={`p-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'bg-green-50 ring-1 ring-[#5D4037]' : 'bg-gray-50 hover:bg-gray-100'}`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-3 h-3 rounded-full border flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-[#5D4037]' : 'border-gray-300'}`}>
-                                                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#5D4037]"></div>}
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className={`text-xs font-medium ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>{opt.name}</span>
-                                                                    <span className="text-[10px] text-gray-400">{opt.duration} นาที</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className={`text-xs font-bold ${isSelected ? 'text-[#5D4037]' : 'text-gray-500'}`}>
-                                                                {profile.currencySymbol || '฿'}{Number(opt.price).toLocaleString()}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* สรุปยอด Fixed Bottom */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t h-20 z-50">
-                        <div className="max-w-md mx-auto h-full px-4 flex items-center justify-between">
-                            <div>
-                                <div className="flex gap-2 items-center">
-                                    <span className="text-xs text-gray-500">ระยะเวลา</span>
-                                    <span className="text-sm font-bold text-gray-800">{totalDuration} นาที</span>
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                    <span className="text-xs text-gray-500">รวม</span>
-                                    <span className="text-lg font-bold text-[#5D4037] leading-none">{profile.currencySymbol || '฿'}{totalPrice.toLocaleString()}</span>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleConfirm}
-                                className="px-8 py-2.5 bg-[#5D4037] hover:bg-[#3E2723] text-white rounded-2xl font-bold text-base transition-colors shadow-lg shadow-[#5D4037]/20 disabled:bg-gray-300 disabled:shadow-none"
-                                disabled={
-                                    (service.serviceType === 'option-based' && (selectedTargetAreas.length === 0 || selectedOptionIndex === null)) ||
-                                    (service.serviceType === 'area-based-options' && Object.keys(selectedAreaOptions).length === 0)
-                                }
-                            >
-                                จองบริการ
-                            </button>
-                        </div>
+                        )}
                     </div>
-                </div>
+                )}
 
-                {/* Add-ons */}
-                {(service.addOnServices && service.addOnServices.length > 0) && (
-                    <div className="py-4 border-t mt-2">
-                        <h2 className="text-sm font-bold mb-2">รายการเสริม</h2>
+                {/* Area-Based-Options UI */}
+                {service.serviceType === 'area-based-options' && (
+                    <div className="bg-white p-4.5 rounded-3xl border border-[#e7e0da] shadow-2xs space-y-3">
+                        <h2 className="text-xs font-bold text-[#3e2723] uppercase tracking-wider">
+                            เลือกบริเวณและตัวเลือกการดูแล
+                        </h2>
+                        {service.areaOptions?.map((areaGroup, areaIdx) => {
+                            const isExpanded = expandedArea === areaGroup.areaName;
+                            const selectedOptIdx = selectedAreaOptions[areaGroup.areaName];
+                            const selectedOpt = selectedOptIdx !== undefined ? areaGroup.options[selectedOptIdx] : null;
+
+                            return (
+                                <div
+                                    key={areaIdx}
+                                    className={`rounded-2xl overflow-hidden transition-all border ${
+                                        selectedOpt ? 'border-[#5d4037] bg-[#faf8f5]' : 'border-[#e7e0da] bg-white'
+                                    }`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleAreaExpand(areaGroup.areaName)}
+                                        className="w-full p-3.5 flex items-center justify-between text-left"
+                                    >
+                                        <div>
+                                            <span className="text-xs sm:text-sm font-bold text-[#3e2723]">
+                                                {areaGroup.areaName}
+                                            </span>
+                                            {selectedOpt && (
+                                                <p className="text-[11px] text-[#5d4037] font-semibold mt-0.5 font-mono">
+                                                    ✓ {selectedOpt.name} ({Number(selectedOpt.price).toLocaleString()} {profile.currencySymbol || '฿'})
+                                                </p>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-[#8d6e63]">
+                                            {isExpanded ? '▲' : '▼'}
+                                        </span>
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="p-2.5 bg-white border-t border-[#f0eae4] space-y-2">
+                                            {areaGroup.options?.map((opt, optIdx) => {
+                                                const isSelected = selectedOptIdx === optIdx;
+                                                return (
+                                                    <div
+                                                        key={optIdx}
+                                                        onClick={() => handleAreaOptionSelect(areaGroup.areaName, optIdx)}
+                                                        className={`p-2.5 rounded-xl flex items-center justify-between cursor-pointer border text-xs ${
+                                                            isSelected
+                                                                ? 'bg-[#f5ede8] border-[#5d4037] font-semibold'
+                                                                : 'bg-[#faf8f5] border-[#e7e0da] hover:bg-white'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#5d4037]' : 'border-[#d7ccc8]'}`}>
+                                                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#5d4037]" />}
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[#3e2723]">{opt.name}</span>
+                                                                <span className="text-[10px] text-[#8d6e63] ml-1">({opt.duration} น.)</span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="font-bold text-[#3e2723] font-mono">
+                                                            {Number(opt.price).toLocaleString()} {profile.currencySymbol || '฿'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Add-ons Section */}
+                {service.addOnServices && service.addOnServices.length > 0 && (
+                    <div className="bg-white p-4.5 rounded-3xl border border-[#e7e0da] shadow-2xs space-y-2.5">
+                        <h2 className="text-xs font-bold text-[#3e2723] uppercase tracking-wider">
+                            บริการเสริมเพิ่มเติม (Add-ons)
+                        </h2>
                         <div className="space-y-2">
                             {service.addOnServices.map((addOn, idx) => (
                                 <AddOnCard
                                     key={idx}
                                     addOn={addOn}
-                                    isSelected={selectedAddOns.some(item => item.name === addOn.name)}
+                                    isSelected={selectedAddOns.some((item) => item.name === addOn.name)}
                                     onToggle={toggleAddOn}
                                 />
                             ))}
@@ -423,16 +462,55 @@ function ServiceDetailContent() {
                     </div>
                 )}
 
-                {/* Details */}
-                {service.details && (
-                    <div className="py-2 mt-2">
-                        <h2 className="text-sm font-bold mb-2">รายละเอียดบริการ</h2>
-                        <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
-                            {service.details}
+                {/* Details Section */}
+                {(service.details || service.description) && (
+                    <div className="bg-white p-4.5 rounded-3xl border border-[#e7e0da] shadow-2xs space-y-2">
+                        <h2 className="text-xs font-bold text-[#3e2723] uppercase tracking-wider">
+                            รายละเอียดการให้บริการ
+                        </h2>
+                        <p className="text-xs text-[#5d4037] leading-relaxed whitespace-pre-line">
+                            {service.details || service.description}
                         </p>
                     </div>
                 )}
+            </div>
 
+            {/* Floating Luxury Bottom Bar */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] shadow-xl py-3 px-4 z-50">
+                <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-[#8d6e63]">
+                            <span>ระยะเวลารวม:</span>
+                            <span className="font-bold text-[#3e2723]">{totalDuration} นาที</span>
+                        </div>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-xs text-[#8d6e63] font-medium">รวม</span>
+                            <span className="text-xl font-extrabold text-[#3e2723] font-mono leading-none">
+                                {totalPrice.toLocaleString()}
+                            </span>
+                            <span className="text-xs font-bold text-[#8d6e63]">
+                                {profile.currencySymbol || '฿'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={
+                            (service.serviceType === 'option-based' &&
+                                (selectedTargetAreas.length === 0 || selectedOptionIndex === null)) ||
+                            (service.serviceType === 'area-based-options' &&
+                                Object.keys(selectedAreaOptions).length === 0)
+                        }
+                        className="px-6 h-12 rounded-2xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-40 flex items-center gap-2 shrink-0"
+                    >
+                        <span>เลือกวันและเวลา</span>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -442,8 +520,8 @@ export default function ServiceDetailPage() {
     return (
         <Suspense
             fallback={
-                <div className="flex flex-col items-center justify-center min-h-screen">
-                    <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+                <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                    <SpaFlowerIcon className="w-12 h-12 animate-spin text-[#5d4037]" style={{ animationDuration: '3s' }} />
                 </div>
             }
         >

@@ -7,6 +7,7 @@ import { redeemReward } from '@/app/actions/rewardActions';
 import { Notification, ConfirmationModal } from '@/app/components/common/NotificationComponent';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useProfile } from '@/context/ProfileProvider';
+import SpaFlowerIcon from '@/app/components/common/SpaFlowerIcon';
 
 interface Reward {
     id: string;
@@ -21,31 +22,58 @@ interface CustomerData {
     points: number;
 }
 
-const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }: { reward: Reward, userPoints: number, onRedeem: (id: string) => void, isRedeeming: boolean }) => {
+const RewardCard = ({
+    reward,
+    userPoints,
+    onRedeem,
+    isRedeeming,
+}: {
+    reward: Reward;
+    userPoints: number;
+    onRedeem: (id: string) => void;
+    isRedeeming: boolean;
+}) => {
     const { profile } = useProfile();
+    const currency = profile?.currencySymbol || '฿';
     const canRedeem = userPoints >= reward.pointsRequired;
+    const diff = reward.pointsRequired - userPoints;
+
     return (
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center transition-all hover:shadow-md">
-            <div>
-                <h3 className="font-bold text-gray-900 text-lg">{reward.name}</h3>
-                <p className="text-sm text-gray-500">{reward.description}</p>
-                <div className="text-sm text-[#5D4037] font-medium mt-1 inline-flex items-center gap-1 bg-[#F5F2ED] px-2 py-0.5 rounded-lg">
-                    <span>{reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${profile.currencySymbol || '฿'}${reward.discountValue}`}</span>
+        <div className="bg-white p-4.5 rounded-3xl shadow-xs border border-[#e7e0da] flex justify-between items-center gap-3 transition-all hover:shadow-sm">
+            <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-sm text-[#3e2723] truncate">{reward.name}</h3>
+                {reward.description && (
+                    <p className="text-xs text-[#8d6e63] mt-0.5 line-clamp-2">{reward.description}</p>
+                )}
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#5d4037] bg-[#f5f0eb] border border-[#e7e0da] px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                        <span>{reward.discountType === 'percentage' ? `ลด ${reward.discountValue}%` : `ลด ${reward.discountValue} ${currency}`}</span>
+                    </span>
+
+                    <span className="text-xs font-semibold text-[#8d6e63] flex items-center gap-1">
+                        <span className="text-amber-500 font-bold">✦</span>
+                        <span>{reward.pointsRequired.toLocaleString()} แต้ม</span>
+                    </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                    ใช้ {reward.pointsRequired} คะแนน
-                </p>
+
+                {!canRedeem && diff > 0 && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                        (ขาดอีก {diff.toLocaleString()} แต้ม)
+                    </p>
+                )}
             </div>
+
             <button
                 onClick={() => onRedeem(reward.id)}
                 disabled={!canRedeem || isRedeeming}
-                className={`font-semibold px-5 py-2 rounded-2xl text-sm transition-all ${canRedeem
-                    ? 'bg-[#5D4037] text-white hover:bg-[#3E2723] shadow-sm hover:shadow'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
+                className={`font-bold px-4 py-2.5 rounded-2xl text-xs transition-all flex-shrink-0 active:scale-95 ${
+                    canRedeem
+                        ? 'bg-[#5d4037] text-white hover:bg-[#4a3429] shadow-sm shadow-[#5d4037]/20'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                }`}
             >
-                {isRedeeming ? '...' : 'แลก'}
+                {isRedeeming ? 'กำลังแลก...' : canRedeem ? 'แลกรางวัล' : 'แต้มไม่พอ'}
             </button>
         </div>
     );
@@ -75,10 +103,15 @@ export default function RewardsPage() {
     useEffect(() => {
         const fetchRewards = async () => {
             setLoading(true);
-            const q = query(collection(db, 'rewards'), orderBy('pointsRequired'));
-            const snapshot = await getDocs(q);
-            setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward)));
-            setLoading(false);
+            try {
+                const q = query(collection(db, 'rewards'), orderBy('pointsRequired'));
+                const snapshot = await getDocs(q);
+                setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward)));
+            } catch (err) {
+                console.error("Error fetching rewards:", err);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchRewards();
     }, []);
@@ -96,7 +129,7 @@ export default function RewardsPage() {
         const lineAccessToken = liff?.getAccessToken?.();
         const result = await redeemReward(liffProfile.userId, selectedRewardId, { lineAccessToken });
         if (result.success) {
-            setNotification({ show: true, title: "แลกสำเร็จ!", message: "คุณได้รับคูปองใหม่แล้ว", type: 'success' });
+            setNotification({ show: true, title: "แลกสำเร็จ!", message: "คุณได้รับคูปองส่วนลดใหม่เรียบร้อยแล้ว", type: 'success' });
         } else {
             setNotification({ show: true, title: "เกิดข้อผิดพลาด", message: result.error || 'Unknown error', type: 'error' });
         }
@@ -109,54 +142,86 @@ export default function RewardsPage() {
         setSelectedRewardId(null);
     };
 
-    if (loading || liffLoading) return <div className="text-center p-10 text-gray-500">กำลังโหลด...</div>
+    if (loading || liffLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
+                <p className="text-xs text-[#8d6e63] mt-3 font-medium">กำลังโหลดข้อมูลของรางวัล...</p>
+            </div>
+        );
+    }
+
+    const currentPoints = customer?.points ?? 0;
 
     return (
-        <div>
+        <div className="min-h-screen bg-[#faf8f5]">
             <CustomerHeader showBackButton={true} title="แลกของรางวัล" backUrl="/appointment" />
-            <div className="px-6 pb-6 space-y-6 max-w-md mx-auto pt-6 bg-[#faf9f6] min-h-screen">
+            
+            <div className="w-full max-w-md mx-auto px-4 py-4 pb-28 space-y-4">
                 <Notification {...notification} title={notification.title || ''} />
+                
                 <ConfirmationModal
                     show={showModal}
                     title="ยืนยันการแลกของรางวัล"
-                    message="คุณต้องการใช้คะแนนเพื่อแลกของรางวัลนี้ใช่หรือไม่?"
+                    message="คุณต้องการใช้คะแนนสะสมเพื่อแลกคูปองส่วนลดนี้ใช่หรือไม่?"
                     onConfirm={handleConfirmRedeem}
                     onCancel={handleCancelRedeem}
                     isProcessing={isRedeeming}
                 />
 
-                {/* Points Card */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm text-center border border-gray-100 relative overflow-hidden">
-                    <div className="relative z-10">
-                        <p className="text-gray-500 text-sm font-medium mb-1">คะแนนสะสมของคุณ</p>
-                        <p className="text-5xl font-bold text-[#5D4037] tracking-tight">{customer?.points ?? 0}</p>
-                        <p className="text-xs text-[#5D4037]/50 mt-2 font-medium">คะแนนที่ใช้แลกได้</p>
+                {/* Points Hero Card */}
+                <div className="bg-gradient-to-br from-[#5d4037] via-[#4a3429] to-[#3e2723] rounded-3xl p-6 text-white text-center shadow-md relative overflow-hidden">
+                    {/* Background flower watermark */}
+                    <div className="absolute top-[-25px] right-[-25px] opacity-10 pointer-events-none">
+                        <SpaFlowerIcon className="w-36 h-36" color="#ffffff" />
                     </div>
-                    {/* Decoration bg */}
-                    <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-[#F5F2ED] rounded-full opacity-50 blur-2xl"></div>
-                    <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-green-50 rounded-full opacity-50 blur-xl"></div>
+
+                    <div className="relative z-10">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs text-amber-200 font-medium mb-3">
+                            <span>✦</span>
+                            <span>คะแนนสะสมสมาชิกของคุณ</span>
+                        </div>
+                        
+                        <div className="text-5xl font-black text-white tracking-tight">
+                            {currentPoints.toLocaleString()}
+                        </div>
+                        
+                        <p className="text-xs text-[#d7ccc8] mt-2 font-medium">
+                            ใช้คะแนนสะสมแลกรับคูปองส่วนลดและสิทธิพิเศษมากมาย
+                        </p>
+                    </div>
                 </div>
 
-                <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <span className="w-1 h-6 bg-[#5D4037] rounded-full"></span>
-                        ของรางวัลทั้งหมด
-                    </h2>
+                {/* Rewards List */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <h2 className="text-sm font-bold text-[#3e2723] flex items-center gap-1.5">
+                            <span className="w-1.5 h-4 bg-[#5d4037] rounded-full"></span>
+                            <span>ของรางวัลทั้งหมด</span>
+                        </h2>
+                        <span className="text-xs text-[#8d6e63]">
+                            {rewards.length} รายการ
+                        </span>
+                    </div>
+
                     {rewards.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                             {rewards.map(reward => (
                                 <RewardCard
                                     key={reward.id}
                                     reward={reward}
-                                    userPoints={customer?.points ?? 0}
+                                    userPoints={currentPoints}
                                     onRedeem={handleRedeemClick}
                                     isRedeeming={isRedeeming && selectedRewardId === reward.id}
                                 />
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-10 bg-white/50 rounded-2xl border border-dashed border-gray-300">
-                            <p className="text-gray-500">ยังไม่มีของรางวัลให้แลกในขณะนี้</p>
+                        <div className="text-center py-12 px-6 bg-white rounded-3xl border border-[#e7e0da] shadow-sm">
+                            <div className="w-12 h-12 bg-[#faf8f5] rounded-full flex items-center justify-center mx-auto mb-2.5 border border-[#e7e0da]">
+                                <SpaFlowerIcon className="w-6 h-6" color="#8d6e63" />
+                            </div>
+                            <p className="text-xs text-[#8d6e63]">ยังไม่มีรายการของรางวัลให้แลกในขณะนี้</p>
                         </div>
                     )}
                 </div>

@@ -197,7 +197,7 @@ export default function ImageUploadBase64({
                                 fill
                                 className="object-cover"
                                 onError={() => setImageError(true)}
-                                unoptimized={!!isBase64}
+                                unoptimized
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">

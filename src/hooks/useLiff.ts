@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { db, doc, getDoc } from '@/app/lib/supabaseDb';
 
 const MOCK_PROFILE = {
     userId: 'U_TEST_1234567890ABCDEF',
@@ -53,14 +54,26 @@ const useLiff = (liffId?: string) => {
                 return;
             }
 
-            if (!liffId) {
-                setError("LIFF ID is not provided.");
+            let activeLiffId = liffId;
+            if (!activeLiffId) {
+                try {
+                    const snap = await getDoc(doc(db, 'settings', 'notifications'));
+                    if (snap.exists()) {
+                        activeLiffId = snap.data()?.lineNotifications?.liffId;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch LIFF ID from settings:", e);
+                }
+            }
+
+            if (!activeLiffId) {
+                setError("ยังไม่ได้ตั้งค่า LIFF ID (กรุณากำหนดในหน้าตั้งค่าระบบ)");
                 setLoading(false);
                 return;
             }
             try {
                 const liff = (await import('@line/liff')).default;
-                await liff.init({ liffId });
+                await liff.init({ liffId: activeLiffId });
 
                 if (!liff.isLoggedIn()) {
                     liff.login({

@@ -19,7 +19,7 @@ export default function MyAppointmentsPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [historyBookings, setHistoryBookings] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showHistory, setShowHistory] = useState(false);
+    const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
     const [notification, setNotification] = useState<{ show: boolean, title: string, message: string, type: 'success' | 'error' | 'warning' }>({ show: false, title: '', message: '', type: 'success' });
     const [showQrModal, setShowQrModal] = useState(false);
     const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function MyAppointmentsPage() {
         const unsubscribe = onSnapshot(appointmentsQuery, (snapshot) => {
             const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
 
-            // --- กรองข้อมูลนัดหมายปัจจุบัน ---
+            // กรองข้อมูลนัดหมายปัจจุบัน
             const activeStatus = ['awaiting_confirmation', 'confirmed', 'in_progress', 'pending'];
             const filteredDocs = allDocs
                 .filter(doc => activeStatus.includes(doc.status))
@@ -65,7 +65,7 @@ export default function MyAppointmentsPage() {
             setAppointments(filteredDocs);
             setLoading(false);
 
-            // --- กรองประวัติย้อนหลัง ---
+            // กรองประวัติย้อนหลัง
             const historyStatus = ["completed", "cancelled"];
             const historyDocs = allDocs
                 .filter(doc => historyStatus.includes(doc.status))
@@ -78,7 +78,7 @@ export default function MyAppointmentsPage() {
 
         }, (error) => {
             console.error("Error fetching appointments:", error);
-            setNotification({ show: true, title: 'Error', message: 'Connection Error. Please retry.', type: 'error' });
+            setNotification({ show: true, title: 'Error', message: 'เกิดข้อผิดพลาดในการโหลดข้อมูล', type: 'error' });
             setLoading(false);
         });
 
@@ -100,7 +100,7 @@ export default function MyAppointmentsPage() {
         const lineAccessToken = liff?.getAccessToken?.();
         const result = await cancelAppointmentByUser(appointmentToCancel.id, profile.userId, { lineAccessToken });
         if (result.success) {
-            setNotification({ show: true, title: 'สำเร็จ', message: 'ยกเลิกนัดหมายแล้ว', type: 'success' });
+            setNotification({ show: true, title: 'สำเร็จ', message: 'ยกเลิกนัดหมายเรียบร้อยแล้ว', type: 'success' });
         } else {
             setNotification({ show: true, title: 'ผิดพลาด', message: typeof result.error === 'string' ? result.error : 'Unknown error', type: 'error' });
         }
@@ -114,90 +114,144 @@ export default function MyAppointmentsPage() {
         const lineAccessToken = liff?.getAccessToken?.();
         const result = await confirmAppointmentByUser(appointment.id, profile.userId, { lineAccessToken });
         if (result.success) {
-            setNotification({ show: true, title: 'สำเร็จ', message: 'ยืนยันการนัดหมายเรียบร้อย', type: 'success' });
+            setNotification({ show: true, title: 'สำเร็จ', message: 'ยืนยันการนัดหมายเรียบร้อยแล้ว', type: 'success' });
         } else {
             setNotification({ show: true, title: 'ผิดพลาด', message: typeof result.error === 'string' ? result.error : 'Unknown error', type: 'error' });
         }
         setIsConfirming(false);
     };
 
-    // --- Loading Screen ---
     if (liffLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
+                <p className="text-xs text-[#8d6e63] mt-3 font-medium">กำลังโหลดข้อมูลนัดหมาย...</p>
             </div>
         );
     }
 
-    if (liffError) return <div className="p-4 text-center text-red-500">LIFF Error: {liffError}</div>;
+    if (liffError) {
+        return (
+            <div className="p-6 text-center text-rose-600 bg-rose-50 rounded-2xl m-4 border border-rose-200">
+                <p className="font-bold text-sm">การเชื่อมต่อ LINE ผิดพลาด</p>
+                <p className="text-xs mt-1">{liffError}</p>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            <CustomerHeader showBackButton={false} showActionButtons={false} />
-            <div className="p-4 space-y-5 pb-20">
+        <div className="min-h-screen bg-[#faf8f5]">
+            <CustomerHeader showBackButton={false} showActionButtons={true} title="นัดหมายของฉัน" />
+            
+            <div className="w-full max-w-md mx-auto px-4 py-4 pb-28 space-y-4">
                 <Notification {...notification} />
 
                 <ConfirmationModal
                     show={!!appointmentToCancel}
-                    title="ยืนยันการยกเลิก"
-                    message={`คุณต้องการยกเลิกการนัดหมายบริการ ${appointmentToCancel?.serviceInfo.name} ใช่หรือไม่?`}
+                    title="ยืนยันการยกเลิกนัดหมาย"
+                    message={`คุณต้องการยกเลิกการนัดหมายบริการ "${appointmentToCancel?.serviceInfo.name}" ใช่หรือไม่?`}
                     onConfirm={confirmCancelAppointment}
                     onCancel={() => setAppointmentToCancel(null)}
                     isProcessing={isCancelling}
                 />
+
                 <QrCodeModal
                     show={showQrModal}
                     onClose={() => setShowQrModal(false)}
                     appointmentId={selectedAppointmentId}
                 />
 
-                <div className="space-y-4">
-                    <div className="font-bold text-md text-gray-700">นัดหมายของฉัน</div>
+                {/* Segmented Tab Bar */}
+                <div className="bg-[#f0ebe5] p-1 rounded-2xl flex items-center gap-1 border border-[#e7e0da]/80 shadow-xs">
+                    <button
+                        onClick={() => setActiveTab('upcoming')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                            activeTab === 'upcoming'
+                                ? 'bg-white text-[#5d4037] shadow-sm'
+                                : 'text-[#8d6e63] hover:text-[#3e2723]'
+                        }`}
+                    >
+                        <span>นัดหมายปัจจุบัน</span>
+                        {appointments.length > 0 && (
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                activeTab === 'upcoming' ? 'bg-[#5d4037] text-white' : 'bg-[#e7e0da] text-[#5d4037]'
+                            }`}>
+                                {appointments.length}
+                            </span>
+                        )}
+                    </button>
 
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <SpaFlowerIcon className="w-14 h-14 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
-                            <p className="text-sm text-gray-400 mt-2">Loading data...</p>
-                        </div>
-                    ) : appointments.length === 0 ? (
-                        <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl">
-                            <p className="font-semibold">ไม่มีรายการนัดหมายที่กำลังดำเนินอยู่</p>
-                            <button className="mt-4 px-4 py-2 text-sm rounded-lg btn-primary" onClick={() => router.push('/appointment')}>จองบริการใหม่</button>
-                        </div>
-                    ) : (
-                        appointments.map((job) => (
-                            <AppointmentCard
-                                key={job.id}
-                                job={job}
-                                onQrCodeClick={() => handleQrCodeClick(job.id!)}
-                                onCancelClick={handleCancelClick}
-                                onConfirmClick={handleConfirmClick}
-                                isConfirming={isConfirming}
-                            />
-                        ))
-                    )}
-                </div>
-
-                <div className="flex flex-col items-center mt-6">
-                    <button className="flex items-center gap-2 focus:outline-none font-medium px-4 py-2 rounded-full btn-secondary" onClick={() => setShowHistory(v => !v)}>
-                        <span className="text-sm">{showHistory ? '▲ ซ่อนประวัติที่ผ่านมา' : '▼ ดูประวัติที่ผ่านมา'}</span>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                            activeTab === 'history'
+                                ? 'bg-white text-[#5d4037] shadow-sm'
+                                : 'text-[#8d6e63] hover:text-[#3e2723]'
+                        }`}
+                    >
+                        <span>ประวัติย้อนหลัง</span>
+                        {historyBookings.length > 0 && (
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                activeTab === 'history' ? 'bg-[#5d4037] text-white' : 'bg-[#e7e0da] text-[#5d4037]'
+                            }`}>
+                                {historyBookings.length}
+                            </span>
+                        )}
                     </button>
                 </div>
 
-                {showHistory && (
-                    <div className="space-y-4 mt-2 animate-fade-in-up">
-                        <div className="text-sm text-gray-700 font-medium ml-1">ประวัติการใช้บริการ</div>
-                        {historyBookings.length === 0 ? (
-                            <div className="text-center text-gray-500 py-8 bg-white p-4 rounded-xl border border-gray-100">
-                                <p className="text-sm">ยังไม่มีประวัติการใช้บริการ</p>
+                {/* Tab: Upcoming Appointments */}
+                {activeTab === 'upcoming' && (
+                    <div className="space-y-3.5">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-16">
+                                <SpaFlowerIcon className="w-10 h-10 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
+                                <p className="text-xs text-[#8d6e63] mt-2 font-medium">กำลังโหลดรายการนัดหมาย...</p>
+                            </div>
+                        ) : appointments.length === 0 ? (
+                            <div className="text-center py-12 px-6 bg-white rounded-3xl border border-[#e7e0da] shadow-sm">
+                                <div className="w-14 h-14 bg-[#faf8f5] rounded-full flex items-center justify-center mx-auto mb-3 border border-[#e7e0da]">
+                                    <SpaFlowerIcon className="w-7 h-7" color="#8d6e63" />
+                                </div>
+                                <h3 className="font-bold text-sm text-[#3e2723]">ไม่มีรายการนัดหมายปัจจุบัน</h3>
+                                <p className="text-xs text-[#8d6e63] mt-1 max-w-xs mx-auto">
+                                    คุณสามารถเลือกดูคอร์สบริการสปาและจองเวลานัดหมายที่สะดวกได้ทันที
+                                </p>
+                                <button
+                                    onClick={() => router.push('/appointment')}
+                                    className="mt-4 px-6 py-2.5 rounded-2xl text-xs font-bold bg-[#5d4037] text-white hover:bg-[#4a3429] shadow-sm shadow-[#5d4037]/20 transition-all active:scale-95"
+                                >
+                                    จองบริการใหม่
+                                </button>
                             </div>
                         ) : (
-                            historyBookings.slice(0, 10).map(job => (
+                            appointments.map((job) => (
+                                <AppointmentCard
+                                    key={job.id}
+                                    job={job}
+                                    onQrCodeClick={() => handleQrCodeClick(job.id!)}
+                                    onCancelClick={handleCancelClick}
+                                    onConfirmClick={handleConfirmClick}
+                                    isConfirming={isConfirming}
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {/* Tab: History */}
+                {activeTab === 'history' && (
+                    <div className="space-y-3">
+                        {historyBookings.length === 0 ? (
+                            <div className="text-center py-12 px-6 bg-white rounded-3xl border border-[#e7e0da] shadow-sm">
+                                <p className="text-xs text-[#8d6e63]">ยังไม่มีประวัติการใช้บริการที่ผ่านมา</p>
+                            </div>
+                        ) : (
+                            historyBookings.map(job => (
                                 <HistoryCard
                                     key={job.id}
                                     appointment={job}
-                                    onBookAgain={() => { router.push('/appointment'); }}
+                                    onBookAgain={() => router.push('/appointment')}
                                 />
                             ))
                         )}

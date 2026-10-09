@@ -12,14 +12,21 @@ import {
     createAppointmentReminderFlexTemplate,
     createDailyAppointmentNotificationFlexTemplate
 } from './flexTemplateActions';
+import { getNotificationSettings } from './settingsActions';
 
 /**
  * Helper function to send Flex Messages via LINE Messaging API.
  */
 async function sendFlexMessage(userId: string, flexTemplate: any, actionName: string) {
     try {
-        if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
-            console.error('❌ LINE_CHANNEL_ACCESS_TOKEN not found in environment variables');
+        let token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (!token || token === 'placeholder_channel_access_token') {
+            const { settings } = await getNotificationSettings();
+            token = settings?.lineNotifications?.channelAccessToken?.trim();
+        }
+
+        if (!token || token === 'placeholder_channel_access_token') {
+            console.error('❌ LINE_CHANNEL_ACCESS_TOKEN not found in environment variables or settings');
             return { success: false, error: 'LINE_CHANNEL_ACCESS_TOKEN not configured' };
         }
 
@@ -27,7 +34,7 @@ async function sendFlexMessage(userId: string, flexTemplate: any, actionName: st
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
                 to: userId,
@@ -68,8 +75,8 @@ export async function sendAppointmentConfirmedFlexMessage(userId: string, appoin
     return sendFlexMessage(userId, flexTemplate, 'Appointment Confirmed');
 }
 
-export async function sendServiceCompletedFlexMessage(userId: string, appointmentData: any) {
-    const flexTemplate = await createServiceCompletedFlexTemplate(appointmentData);
+export async function sendServiceCompletedFlexMessage(userId: string, appointmentData: any, options?: { includeReviewButton?: boolean }) {
+    const flexTemplate = await createServiceCompletedFlexTemplate(appointmentData, options);
     return sendFlexMessage(userId, flexTemplate, 'Service Completed');
 }
 
@@ -88,8 +95,11 @@ export async function sendPaymentConfirmationFlexMessage(userId: string, appoint
     return sendFlexMessage(userId, flexTemplate, 'Payment Confirmation');
 }
 
-export async function sendReviewThankYouFlexMessage(userId: string, pointsAwarded = 0) {
-    const flexTemplate = await createReviewThankYouFlexTemplate({ pointsAwarded });
+export async function sendReviewThankYouFlexMessage(userId: string, reviewOrPoints: any = 0) {
+    const reviewData = typeof reviewOrPoints === 'object' && reviewOrPoints !== null
+        ? reviewOrPoints
+        : { pointsAwarded: Number(reviewOrPoints) || 0 };
+    const flexTemplate = await createReviewThankYouFlexTemplate(reviewData);
     return sendFlexMessage(userId, flexTemplate, 'Review Thank You');
 }
 

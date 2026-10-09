@@ -2,32 +2,52 @@
 
 import { db } from '@/app/lib/supabaseDb';
 import { sendReminderNotification } from '@/app/actions/lineActions';
+import { getNotificationSettings } from '@/app/actions/settingsActions';
 
 /**
  * Send reminder notifications to customers 1 hour before their appointment
- * This function should be called by a cron job
+ * This function should be called by a cron job or scheduled task
  */
 export async function sendAppointmentReminders() {
     try {
-        // Get current time and calculate 1 hour from now
-        const now = new Date();
-        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+        // 1. Check settings first
+        const { success, settings } = await getNotificationSettings();
+        const allEnabled = settings?.allNotifications?.enabled !== false;
+        const customerEnabled = allEnabled && (settings?.customerNotifications?.enabled !== false);
+        const reminderEnabled = customerEnabled && (settings?.customerNotifications?.appointmentReminder !== false);
 
-        // Format date and time for comparison
-        const targetDate = oneHourFromNow.toISOString().split('T')[0]; // YYYY-MM-DD
-        const targetHour = oneHourFromNow.getHours();
-        const targetTime = `${targetHour.toString().padStart(2, '0')}:00`; // HH:00
+        if (!reminderEnabled) {
+            return { success: true, message: 'Appointment reminder notification is disabled in settings.' };
+        }
 
-        // Query appointments that are confirmed and scheduled for 1 hour from now
+        // 2. Calculate Thailand Time 1 hour from now
+        const now = Date.now();
+        const oneHourLater = new Date(now + 60 * 60 * 1000);
+
+        const targetDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Bangkok',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(oneHourLater);
+
+        const targetHour = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Bangkok',
+            hour: '2-digit',
+            hour12: false
+        }).format(oneHourLater);
+
+        const targetTimePrefix = `${targetHour}:`; // Matches HH:00, HH:15, HH:30, etc.
+
+        // Query appointments that are confirmed for target date
         const appointmentsQuery = db.collection('appointments')
             .where('status', '==', 'confirmed')
-            .where('date', '==', targetDate)
-            .where('time', '==', targetTime);
+            .where('date', '==', targetDate);
 
         const snapshot = await appointmentsQuery.get();
 
         if (snapshot.empty) {
-            return { success: true, message: 'No appointments to remind' };
+            return { success: true, message: 'No appointments found for date ' + targetDate };
         }
 
         const reminderPromises: Promise<any>[] = [];
@@ -35,19 +55,34 @@ export async function sendAppointmentReminders() {
         snapshot.forEach(doc => {
             const appointmentData = doc.data();
 
-            // Check if customer has LINE ID
-            if (appointmentData.userId) {
+            // Check if appointment is within this hour and not yet reminded
+            const appTime = appointmentData.time || '';
+            const isTargetHour = appTime.startsWith(targetTimePrefix);
+            const alreadyReminded = !!appointmentData.reminderSent;
+
+            if (isTargetHour && !alreadyReminded && appointmentData.userId) {
                 const reminderData = {
-                    serviceName: appointmentData.serviceInfo?.name || 'บริการ',
-                    appointmentDate: appointmentData.date,
-                    appointmentTime: appointmentData.time,
-                    shopName: 'ร้านเสริมสวย' // You can make this configurable in settings
+                    id: doc.id,
+                    appointmentId: doc.id,
+                    serviceInfo: appointmentData.serviceInfo,
+                    customerInfo: appointmentData.customerInfo,
+                    date: appointmentData.date,
+                    time: appointmentData.time,
+                    appointmentInfo: appointmentData.appointmentInfo
                 };
 
                 reminderPromises.push(
                     sendReminderNotification(appointmentData.userId, reminderData)
-                        .then((result: any) => {
+                        .then(async (result: any) => {
                             if (result.success) {
+                                try {
+                                    await db.collection('appointments').doc(doc.id).update({
+                                        reminderSent: true,
+                                        reminderSentAt: new Date().toISOString()
+                                    });
+                                } catch (updateErr) {
+                                    console.error('Error updating reminderSent flag:', updateErr);
+                                }
                                 return { appointmentId: doc.id, success: true };
                             } else {
                                 console.error(`Failed to send reminder to ${appointmentData.userId}:`, result.error);
@@ -70,8 +105,9 @@ export async function sendAppointmentReminders() {
 
         return {
             success: true,
-            totalAppointments: snapshot.size,
-            successCount,
+            totalChecked: snapshot.size,
+            targetHour: targetTimePrefix,
+            sentCount: successCount,
             failureCount,
             results
         };

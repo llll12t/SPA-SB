@@ -70,20 +70,6 @@ function PaymentHeader() {
 export default function PaymentLayout({ children }: { children: ReactNode }) {
     const paymentLiffId = process.env.NEXT_PUBLIC_LIFF_ID;
 
-    if (!paymentLiffId) {
-        return (
-            <div className="max-w-md mx-auto bg-[#faf8f5] min-h-screen flex items-center justify-center p-4">
-                <div className="bg-white border border-rose-200 rounded-2xl p-6 text-center max-w-sm w-full shadow-md space-y-2">
-                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-bold text-lg">
-                        !
-                    </div>
-                    <h3 className="font-bold text-[#3e2723] text-sm">ไม่พบการตั้งค่า LIFF สำหรับการชำระเงิน</h3>
-                    <p className="text-[#8d6e63] text-xs">กรุณาติดต่อผู้ดูแลระบบเพื่อระบุ NEXT_PUBLIC_LIFF_ID ใน .env.local</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <LiffProvider liffId={paymentLiffId}>
             <div className="max-w-md mx-auto bg-[#faf8f5] min-h-screen">

@@ -54,7 +54,6 @@ function GeneralInfoContent() {
 
     // New Params (Area-Based-Options)
     const selectedAreaOptionsParam = searchParams.get('selectedAreaOptions');
-    // Type: { [areaName: string]: number } (option index)
     const selectedAreaOptions = selectedAreaOptionsParam ? JSON.parse(selectedAreaOptionsParam) : {};
 
     const [formData, setFormData] = useState({ fullName: "", phone: "", email: "", note: "" });
@@ -98,7 +97,7 @@ function GeneralInfoContent() {
                 if (serviceSnap.exists()) setService({ id: serviceSnap.id, ...serviceSnap.data() } as Service);
 
                 if (technicianId === 'auto-assign') {
-                    setTechnician({ firstName: 'ระบบจัดให้', lastName: '', id: 'auto-assign' });
+                    setTechnician({ firstName: 'ระบบจัดให้อัตโนมัติ', lastName: '', id: 'auto-assign' });
                 } else if (technicianSnap && technicianSnap.exists()) {
                     setTechnician({ id: technicianSnap.id, ...technicianSnap.data() } as TechnicianInfo & { id: string });
                 }
@@ -121,7 +120,7 @@ function GeneralInfoContent() {
         let selectedAreaData: MultiArea | null = null;
         let selectedPackageData: ServiceOption | null = null;
 
-        // 1. Multi-Area Logic (Legacy)
+        // 1. Multi-Area Logic
         if (service.serviceType === 'multi-area' && service.areas && service.areas.length > 0) {
             if (areaIndex !== null && service.areas[areaIndex]) {
                 selectedAreaData = service.areas[areaIndex];
@@ -135,7 +134,7 @@ function GeneralInfoContent() {
                 }
             }
         }
-        // 2. Option-Based Logic (New)
+        // 2. Option-Based Logic
         else if (service.serviceType === 'option-based') {
             let unitPrice = selectedOptionPrice;
             let unitDuration = selectedOptionDuration;
@@ -152,7 +151,7 @@ function GeneralInfoContent() {
             base = unitPrice * areaCount;
             duration = unitDuration * areaCount;
         }
-        // 3. Area-Based-Options Logic (Newest)
+        // 3. Area-Based-Options Logic
         else if (service.serviceType === 'area-based-options') {
             base = 0;
             duration = 0;
@@ -297,7 +296,7 @@ function GeneralInfoContent() {
                 return;
             }
 
-            // Send Flex Message via liff.sendMessages() (on behalf of user in LINE chat)
+            // Send Flex Message via liff.sendMessages()
             if (liff && typeof liff.sendMessages === 'function') {
                 try {
                     const { flexMessage } = await getNewBookingFlexJson({
@@ -313,7 +312,6 @@ function GeneralInfoContent() {
                     });
                     await liff.sendMessages([flexMessage]);
                 } catch (flexErr) {
-                    // sendMessages may fail outside LINE app (e.g. browser) — silent fail is fine
                     console.warn('liff.sendMessages failed (non-critical):', flexErr);
                 }
             }
@@ -331,49 +329,86 @@ function GeneralInfoContent() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
+                <p className="text-xs text-[#8d6e63] mt-3 font-medium">กำลังเตรียมข้อมูลการจอง...</p>
             </div>
         );
     }
 
+    const currency = shopProfile?.currencySymbol || '฿';
+
     return (
-        <div>
+        <div className="min-h-screen bg-[#faf8f5]">
             <CustomerHeader showBackButton={true} showActionButtons={false} backUrl="/appointment/select-date-time" />
-            <div className="px-4 py-2.5 pb-24">
+            
+            <div className="w-full max-w-md mx-auto px-4 py-4 pb-36 space-y-4">
                 
-                {/* Compact Booking Summary Card */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-3.5 shadow-sm">
-                    <div className="p-3 text-black space-y-1.5 text-sm">
-                        <div className="flex justify-between items-center">
-                            <span className="text-gray-500">นัดหมาย</span>
-                            <span className="font-semibold text-gray-900">
-                                {date ? format(new Date(date), 'dd/MM/yyyy', { locale: th }) : '-'} @ {time} น.
-                            </span>
+                {/* Step indicator */}
+                <div className="flex items-center justify-between text-xs px-1">
+                    <span className="font-semibold text-[#5d4037] flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-[#5d4037] text-white flex items-center justify-center text-[11px] font-bold">3</span>
+                        ตรวจสอบข้อมูลและยืนยัน
+                    </span>
+                    <span className="text-[#8d6e63]">ขั้นตอน 3 จาก 3</span>
+                </div>
+
+                {/* Booking Summary Card */}
+                <div className="bg-white rounded-3xl p-5 border border-[#e7e0da] shadow-sm space-y-3.5">
+                    
+                    {/* Date, Time & Provider */}
+                    <div className="bg-[#faf8f5] p-3.5 rounded-2xl border border-[#e7e0da]/70 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white border border-[#e7e0da] flex items-center justify-center text-[#5d4037] shadow-xs">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div className="text-xs font-bold text-[#3e2723]">
+                                    {date ? format(new Date(date), 'd MMMM yyyy', { locale: th }) : '-'}
+                                </div>
+                                <div className="text-xs text-[#8d6e63] font-medium mt-0.5">
+                                    รอบเวลา {time} น. • รวม {totalDuration} นาที
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-start border-t border-gray-100 pt-1.5">
-                            <span className="text-gray-500 pt-0.5">บริการ</span>
-                            <div className="text-right flex-1 pl-4">
-                                <div className="font-bold text-gray-900">{service?.serviceName}</div>
+
+                        {technician && (
+                            <div className="text-right">
+                                <div className="text-[10px] text-[#8d6e63]">ผู้ให้บริการ</div>
+                                <div className="text-xs font-semibold text-[#5d4037]">
+                                    {technician.firstName}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Service Details */}
+                    <div className="pt-1 space-y-2">
+                        <div className="flex justify-between items-start gap-3">
+                            <div className="flex-1">
+                                <div className="text-sm font-bold text-[#3e2723]">{service?.serviceName}</div>
 
                                 {/* Multi-Area Display */}
                                 {selectedArea && (
-                                    <div className="text-xs text-gray-600">{selectedArea.name}</div>
+                                    <span className="inline-block text-[11px] bg-[#f5f0eb] text-[#5d4037] px-2 py-0.5 rounded-md font-medium mt-1 mr-1">
+                                        {selectedArea.name}
+                                    </span>
                                 )}
                                 {selectedPackage && (
-                                    <div className="text-xs text-gray-600">{selectedPackage.name}</div>
+                                    <span className="inline-block text-[11px] bg-[#f5f0eb] text-[#5d4037] px-2 py-0.5 rounded-md font-medium mt-1">
+                                        {selectedPackage.name}
+                                    </span>
                                 )}
 
                                 {/* Option-Based Display */}
                                 {service?.serviceType === 'option-based' && (
-                                    <div className="mt-0.5">
-                                        <div className="text-xs text-gray-800 font-medium flex justify-end items-center gap-1">
-                                            <span>{selectedOptionName}</span>
-                                            <span className="text-xs text-gray-400">({selectedOptionPrice.toLocaleString()} {shopProfile?.currencySymbol || '฿'})</span>
-                                            <span>x {selectedAreas.length} จุด</span>
-                                        </div>
+                                    <div className="mt-1 text-xs text-[#5d4037]">
+                                        <span className="font-semibold">{selectedOptionName}</span>
+                                        <span className="text-[#8d6e63] ml-1">x {selectedAreas.length} จุด</span>
                                         {selectedAreas.length > 0 && (
-                                            <div className="text-[11px] text-gray-500 leading-tight mt-0.5">
+                                            <div className="text-[11px] text-[#8d6e63] mt-0.5">
                                                 ({selectedAreas.join(', ')})
                                             </div>
                                         )}
@@ -382,184 +417,241 @@ function GeneralInfoContent() {
 
                                 {/* Area-Based-Options Display */}
                                 {service?.serviceType === 'area-based-options' && Object.keys(selectedAreaOptions).length > 0 && (
-                                    <div className="mt-0.5 space-y-0.5">
+                                    <div className="mt-1 space-y-0.5">
                                         {Object.entries(selectedAreaOptions).map(([areaName, optIdx]) => {
                                             const optIndex = optIdx as number;
                                             const areaGroup = service.areaOptions?.find(g => g.areaName === areaName);
                                             const opt = areaGroup?.options[optIndex];
                                             if (!opt) return null;
                                             return (
-                                                <div key={areaName} className="text-xs text-gray-600 flex justify-between items-center">
-                                                    <span>{areaName} ({opt.name})</span>
-                                                    <span className="text-[11px] text-gray-400 ml-2">{Number(opt.price).toLocaleString()} {shopProfile?.currencySymbol || '฿'}</span>
+                                                <div key={areaName} className="text-[11px] text-[#5d4037] flex justify-between">
+                                                    <span>• {areaName} ({opt.name})</span>
+                                                    <span className="text-[#8d6e63]">{Number(opt.price).toLocaleString()} {currency}</span>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 )}
-
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                    {totalDuration} นาที | {basePrice.toLocaleString()} {shopProfile?.currencySymbol || '฿'}
-                                </div>
                             </div>
+                            <span className="text-sm font-bold text-[#3e2723] flex-shrink-0">
+                                {basePrice.toLocaleString()} {currency}
+                            </span>
                         </div>
 
+                        {/* Add-ons List */}
                         {selectedAddOns.length > 0 && (
-                            <div className="flex justify-between items-start border-t border-gray-100 pt-1.5">
-                                <span className="text-xs font-semibold text-gray-600 pt-0.5">บริการเสริม</span>
-                                <div className="text-right flex-1 pl-4">
-                                    <div className="text-xs font-semibold text-gray-800">
-                                        {(service?.addOnServices || [])
-                                            .filter(a => selectedAddOns.includes(a.name))
-                                            .map(a => a.name).join(', ')
-                                        }
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                        {(service?.addOnServices || [])
-                                            .filter(a => selectedAddOns.includes(a.name))
-                                            .reduce((sum, a) => sum + (a.duration || 0), 0)
-                                        }นาที | {addOnsTotal.toLocaleString()} {shopProfile?.currencySymbol || '฿'}
-                                    </div>
-                                </div>
+                            <div className="pt-2 border-t border-[#e7e0da]/60">
+                                <div className="text-xs font-semibold text-[#8d6e63] mb-1">บริการเสริมที่เลือก:</div>
+                                {(service?.addOnServices || [])
+                                    .filter(a => selectedAddOns.includes(a.name))
+                                    .map((addon, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-xs py-0.5 text-[#5d4037]">
+                                            <span>+ {addon.name} ({addon.duration} นาที)</span>
+                                            <span className="font-medium">{addon.price?.toLocaleString()} {currency}</span>
+                                        </div>
+                                    ))}
                             </div>
                         )}
                     </div>
 
                     {/* Coupon Section */}
                     {availableCoupons.length > 0 && (
-                        <div className="p-3 border-t border-gray-100">
+                        <div className="pt-2 border-t border-[#e7e0da]/60">
                             <button
                                 type="button"
                                 onClick={() => setShowCoupon(!showCoupon)}
-                                className="flex items-center justify-between w-full text-left text-sm text-[#5D4037] font-semibold"
+                                className="flex items-center justify-between w-full text-xs font-bold text-[#5d4037] py-1 hover:text-[#4a3429]"
                             >
-                                <span>ใช้คูปอง ({availableCoupons.length} ใบ)</span>
-                                <span>{showCoupon ? 'v' : '>'}</span>
+                                <span className="flex items-center gap-1.5">
+                                    <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                                    </svg>
+                                    ใช้คูปองส่วนลด ({availableCoupons.length} ใบที่ใช้ได้)
+                                </span>
+                                <span className="text-xs font-medium text-[#8d6e63] flex items-center gap-1">
+                                    {selectedCouponId ? 'เลือกแล้ว 1 ใบ' : 'เลือกคูปอง'}
+                                    <svg className={`w-3.5 h-3.5 transform transition-transform ${showCoupon ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </span>
                             </button>
 
                             {showCoupon && (
-                                <div className="space-y-1.5 mt-2 animate-fade-in-up">
-                                    <div className="bg-gray-50 text-gray-855 rounded p-2 border border-gray-200 text-xs">
-                                        <div className="flex items-center">
+                                <div className="space-y-2 mt-2 pt-2 border-t border-dashed border-[#e7e0da]">
+                                    <label className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer text-xs transition-all ${
+                                        selectedCouponId === ''
+                                            ? 'bg-[#5d4037]/5 border-[#5d4037] text-[#3e2723] font-semibold'
+                                            : 'bg-white border-[#e7e0da] text-gray-600 hover:bg-[#faf8f5]'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
                                             <input
                                                 type="radio"
-                                                id="no-coupon"
                                                 name="coupon"
                                                 value=""
                                                 checked={selectedCouponId === ''}
                                                 onChange={(e) => setSelectedCouponId(e.target.value)}
-                                                className="mr-2 text-black focus:ring-black"
+                                                className="text-[#5d4037] focus:ring-[#5d4037]"
                                             />
-                                            <label htmlFor="no-coupon" className="text-sm w-full cursor-pointer">ไม่ใช้คูปอง</label>
+                                            <span>ไม่ใช้คูปอง</span>
                                         </div>
-                                    </div>
+                                    </label>
+
                                     {availableCoupons.map(coupon => (
-                                        <div key={coupon.id} className="bg-gray-50 text-gray-855 rounded p-2 border border-gray-200 text-xs">
-                                            <div className="flex items-center">
+                                        <label
+                                            key={coupon.id}
+                                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer text-xs transition-all ${
+                                                selectedCouponId === coupon.id
+                                                    ? 'bg-amber-50/70 border-amber-500/60 text-[#3e2723] font-semibold ring-1 ring-amber-500/30'
+                                                    : 'bg-white border-[#e7e0da] text-gray-700 hover:bg-[#faf8f5]'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
                                                 <input
                                                     type="radio"
-                                                    id={coupon.id}
                                                     name="coupon"
                                                     value={coupon.id}
                                                     checked={selectedCouponId === coupon.id}
                                                     onChange={(e) => setSelectedCouponId(e.target.value)}
-                                                    className="mr-2 text-black focus:ring-black"
+                                                    className="text-[#5d4037] focus:ring-[#5d4037]"
                                                 />
-                                                <label htmlFor={coupon.id} className="w-full cursor-pointer flex justify-between items-center">
-                                                    <span className="font-medium">{coupon.name}</span>
-                                                    <span className="text-green-600 font-semibold">
-                                                        ลด {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `${coupon.discountValue} ${shopProfile?.currencySymbol || '฿'}`}
-                                                    </span>
-                                                </label>
+                                                <span>{coupon.name}</span>
                                             </div>
-                                        </div>
+                                            <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                                                ลด {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `${coupon.discountValue} ${currency}`}
+                                            </span>
+                                        </label>
                                     ))}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Total price row */}
-                    <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-sm">
-                        <span className="text-gray-855 font-bold">ยอดสุทธิ ({totalDuration} นาที)</span>
-                        <div className="text-right">
-                            <span className="text-base font-bold text-[#5D4037]">
-                                {finalPrice.toLocaleString()} {shopProfile?.currencySymbol || '฿'}
+                    {/* Price Breakdown Footer */}
+                    <div className="pt-3 border-t border-[#e7e0da] space-y-1.5 text-xs">
+                        <div className="flex justify-between text-[#8d6e63]">
+                            <span>ค่าบริการหลัก</span>
+                            <span>{basePrice.toLocaleString()} {currency}</span>
+                        </div>
+                        {addOnsTotal > 0 && (
+                            <div className="flex justify-between text-[#8d6e63]">
+                                <span>บริการเสริม</span>
+                                <span>+{addOnsTotal.toLocaleString()} {currency}</span>
+                            </div>
+                        )}
+                        {discount > 0 && (
+                            <div className="flex justify-between text-emerald-700 font-medium">
+                                <span>ส่วนลดคูปอง</span>
+                                <span>-{discount.toLocaleString()} {currency}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-baseline pt-2 border-t border-[#e7e0da]/60">
+                            <span className="font-bold text-sm text-[#3e2723]">ยอดชำระสุทธิ</span>
+                            <span className="font-black text-xl text-[#5d4037]">
+                                {finalPrice.toLocaleString()} {currency}
                             </span>
-                            {discount > 0 && (
-                                <span className="block text-xs text-green-600 mt-0.5">ประหยัด {discount.toLocaleString()} {shopProfile?.currencySymbol || '฿'}</span>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Customer Form Card */}
-                <div className="bg-white text-black rounded-lg p-5 border border-gray-200 shadow-sm">
-                    <h2 className="text-sm font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3.5">ข้อมูลลูกค้า</h2>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Customer Information Form Card */}
+                <div className="bg-white rounded-3xl p-5 border border-[#e7e0da] shadow-sm">
+                    <h2 className="text-sm font-bold text-[#3e2723] pb-3 border-b border-[#e7e0da] flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        ข้อมูลผู้รับบริการ
+                    </h2>
+
+                    <form onSubmit={handleSubmit} className="space-y-3.5 mt-3.5">
                         <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">ชื่อ-สกุล</label>
+                            <label className="block text-xs font-semibold text-[#4a3429] mb-1.5">
+                                ชื่อ-นามสกุล <span className="text-rose-500">*</span>
+                            </label>
                             <input
                                 type="text"
                                 name="fullName"
                                 value={formData.fullName}
                                 onChange={handleChange}
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#5D4037] focus:border-[#5D4037] bg-white outline-none transition-all text-gray-900"
+                                className="w-full px-3.5 py-2.5 rounded-2xl border border-[#e7e0da] text-xs font-medium focus:outline-none focus:border-[#5d4037] focus:ring-2 focus:ring-[#5d4037]/20 bg-[#faf8f5]/50 transition-all text-[#3e2723]"
                                 placeholder="กรอกชื่อ-นามสกุล"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">เบอร์ติดต่อ</label>
+                            <label className="block text-xs font-semibold text-[#4a3429] mb-1.5">
+                                เบอร์โทรศัพท์ติดต่อ <span className="text-rose-500">*</span>
+                            </label>
                             <input
                                 type="tel"
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleChange}
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#5D4037] focus:border-[#5D4037] bg-white outline-none transition-all text-gray-900"
-                                placeholder="กรอกเบอร์โทรศัพท์"
+                                className="w-full px-3.5 py-2.5 rounded-2xl border border-[#e7e0da] text-xs font-medium focus:outline-none focus:border-[#5d4037] focus:ring-2 focus:ring-[#5d4037]/20 bg-[#faf8f5]/50 transition-all text-[#3e2723]"
+                                placeholder="เช่น 0812345678"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">อีเมล (ถ้ามี)</label>
+                            <label className="block text-xs font-semibold text-[#4a3429] mb-1.5">
+                                อีเมล <span className="text-gray-400 font-normal">(ถ้ามี)</span>
+                            </label>
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#5D4037] focus:border-[#5D4037] bg-white outline-none transition-all text-gray-900"
-                                placeholder="กรอกอีเมล"
+                                className="w-full px-3.5 py-2.5 rounded-2xl border border-[#e7e0da] text-xs font-medium focus:outline-none focus:border-[#5d4037] focus:ring-2 focus:ring-[#5d4037]/20 bg-[#faf8f5]/50 transition-all text-[#3e2723]"
+                                placeholder="name@example.com"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1.5">ข้อความเพิ่มเติม</label>
+                            <label className="block text-xs font-semibold text-[#4a3429] mb-1.5">
+                                ข้อความหรือคำขอพิเศษ <span className="text-gray-400 font-normal">(ถ้ามี)</span>
+                            </label>
                             <textarea
                                 name="note"
                                 value={formData.note}
                                 onChange={handleChange}
-                                rows={3}
-                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#5D4037] focus:border-[#5D4037] bg-white resize-none outline-none transition-all text-gray-900"
-                                placeholder="เช่น แพ้ยา, ขอหมอนเพิ่ม"
+                                rows={2}
+                                className="w-full px-3.5 py-2.5 rounded-2xl border border-[#e7e0da] text-xs font-medium focus:outline-none focus:border-[#5d4037] focus:ring-2 focus:ring-[#5d4037]/20 bg-[#faf8f5]/50 resize-none transition-all text-[#3e2723]"
+                                placeholder="เช่น แจ้งอาการแพ้ ระดับน้ำหนักนวดที่ชอบ หรือข้อจำกัดร่างกาย"
                             />
                         </div>
                     </form>
                 </div>
+            </div>
 
-                {/* Confirm Button Fixed Bottom */}
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t h-20 z-50">
-                    <div className="max-w-md mx-auto h-full px-4 flex items-center">
-                        <button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white py-2.5 rounded-2xl font-bold text-base transition-colors shadow-lg shadow-[#5D4037]/20 disabled:opacity-50 transition-all transform active:scale-95"
-                        >
-                            {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการนัดหมาย'}
-                        </button>
+            {/* Sticky Floating Bottom Bar */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] pb-[env(safe-area-inset-bottom,16px)] pt-3.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+                <div className="max-w-md mx-auto px-4 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-[#8d6e63] font-medium">ยอดชำระสุทธิ</div>
+                        <div className="text-xl font-black text-[#5d4037] tracking-tight">
+                            {finalPrice.toLocaleString()} {currency}
+                        </div>
                     </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="bg-[#5d4037] hover:bg-[#4a3429] active:scale-[0.98] text-white px-7 py-3 rounded-2xl font-bold text-sm shadow-md shadow-[#5d4037]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <SpaFlowerIcon className="w-4 h-4 animate-spin" color="#ffffff" />
+                                <span>กำลังจอง...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>ยืนยันการนัดหมาย</span>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
@@ -570,8 +662,8 @@ export default function GeneralInfoPage() {
     return (
         <Suspense
             fallback={
-                <div className="flex flex-col items-center justify-center min-h-screen">
-                    <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#553734" style={{ animationDuration: '3s' }} />
+                <div className="flex flex-col items-center justify-center min-h-screen bg-[#faf8f5]">
+                    <SpaFlowerIcon className="w-16 h-16 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
                 </div>
             }
         >

@@ -11,7 +11,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
         <ToastProvider>
             <LiffProvider liffId={employeeLiffId}>
                 <ProfileProvider>
-                    <div className="bg-gray-50 min-h-screen admin-theme">
+                    <div className="bg-[#faf8f5] min-h-screen text-[#3e2723] antialiased admin-theme">
                         <main>
                             {children}
                         </main>
