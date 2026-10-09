@@ -476,7 +476,15 @@ function ServiceDetailContent() {
             </div>
 
             {/* Floating Luxury Bottom Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] shadow-xl py-3 px-4 z-50">
+            <div
+                className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-4 z-50"
+                style={{
+                    paddingTop: '12px',
+                    paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 16px))',
+                    transform: 'translateZ(0)',
+                    WebkitTransform: 'translateZ(0)',
+                }}
+            >
                 <div className="max-w-md mx-auto flex items-center justify-between gap-3">
                     <div>
                         <div className="flex items-center gap-1.5 text-[11px] text-[#8d6e63]">

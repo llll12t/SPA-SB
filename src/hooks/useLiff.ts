@@ -67,8 +67,8 @@ const useLiff = (liffId?: string) => {
 
             const isLineApp = typeof window !== 'undefined' && /Line\//i.test(window.navigator.userAgent);
 
-            // หากเปิดในเบราว์เซอร์ปกติบนคอมพิวเตอร์ช่วงพัฒนา และไม่ได้ระบุ LIFF ID ให้ใช้ Mock
-            if (isDevelopment && !isLineApp && !activeLiffId) {
+            // หากเปิดในเบราว์เซอร์ปกติบนคอมพิวเตอร์ช่วงพัฒนา ให้ใช้ Mock เพื่อความสะดวกในการทดสอบ
+            if (isDevelopment && !isLineApp) {
                 const mockLiff = {
                     isInClient: () => false,
                     isLoggedIn: () => true,
@@ -114,14 +114,9 @@ const useLiff = (liffId?: string) => {
                     }
                 }
 
-                // 4. ตรวจสอบสถานะ Login (เฉพาะ External Browser ห้ามเรียกในแอป LINE)
-                if (!liff.isInClient()) {
-                    if (!liff.isLoggedIn()) {
-                        liff.login({
-                            redirectUri: window.location.href
-                        });
-                        return;
-                    }
+                // 4. ตรวจสอบสถานะ Login: ไม่บังคับ redirect อัตโนมัติเมื่อเปิดผ่าน External Browser ทั่วไป เพื่อให้เปิดดูข้อมูลหน้าเว็บได้ไม่ Error
+                if (!liff.isInClient() && !liff.isLoggedIn()) {
+                    console.info("Opened in external browser without LINE login session.");
                 }
 
                 // 5. ดึงข้อมูล Profile อย่างปลอดภัย

@@ -352,7 +352,7 @@ function SelectDateTimeContent() {
         <div className="min-h-screen bg-[#faf8f5]">
             <CustomerHeader showBackButton={true} showActionButtons={false} backUrl="/appointment" />
             
-            <div className="w-full max-w-md mx-auto px-4 py-4 pb-36 space-y-6">
+            <div className="w-full max-w-md mx-auto px-4 py-2.5 pb-28 space-y-3 sm:space-y-3.5">
                 
                 {/* Step indicator */}
                 <div className="flex items-center justify-between text-xs px-1">
@@ -364,23 +364,23 @@ function SelectDateTimeContent() {
                 </div>
 
                 {/* Calendar Card */}
-                <div className="w-full bg-white p-5 rounded-3xl shadow-sm border border-[#e7e0da]">
+                <div className="w-full bg-white p-3.5 sm:p-4 rounded-2xl shadow-xs border border-[#e7e0da]">
                     {/* Month Navigator */}
-                    <div className="flex items-center justify-between w-full mb-4">
+                    <div className="flex items-center justify-between w-full mb-2">
                         <button
                             onClick={() => setActiveMonth(prev => {
                                 const d = new Date(prev);
                                 d.setMonth(d.getMonth() - 1);
                                 return d;
                             })}
-                            className="w-9 h-9 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
+                            className="w-8 h-8 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
                             aria-label="Previous month"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <span className="font-bold text-base text-[#3e2723]">
+                        <span className="font-bold text-sm sm:text-base text-[#3e2723]">
                             {activeMonth.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
                         </span>
                         <button
@@ -389,10 +389,10 @@ function SelectDateTimeContent() {
                                 d.setMonth(d.getMonth() + 1);
                                 return d;
                             })}
-                            className="w-9 h-9 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
+                            className="w-8 h-8 flex items-center justify-center text-[#5d4037] hover:bg-[#5d4037]/10 rounded-full transition-colors active:scale-95"
                             aria-label="Next month"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                             </svg>
                         </button>
@@ -400,27 +400,30 @@ function SelectDateTimeContent() {
 
                     <div className="w-full">
                         {/* Day names */}
-                        <div className="grid grid-cols-7 gap-1 mb-2.5">
+                        <div className="grid grid-cols-7 gap-1 mb-1">
                             {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
-                                <div key={i} className="text-xs text-[#8d6e63] text-center font-semibold py-1">
+                                <div key={i} className="text-[11px] sm:text-xs text-[#8d6e63] text-center font-semibold py-0.5">
                                     {d}
                                 </div>
                             ))}
                         </div>
 
                         {/* Calendar days grid */}
-                        <div className="grid grid-cols-7 gap-1.5">
+                        <div className="grid grid-cols-7 gap-1">
                             {(() => {
                                 const year = activeMonth.getFullYear();
                                 const month = activeMonth.getMonth();
                                 const firstDay = new Date(year, month, 1);
+                                const lastDay = new Date(year, month + 1, 0);
+                                const totalDaysSpan = firstDay.getDay() + lastDay.getDate();
+                                const totalCells = totalDaysSpan > 35 ? 42 : 35;
                                 const startDate = new Date(firstDay);
                                 startDate.setDate(startDate.getDate() - firstDay.getDay());
 
                                 const days = [];
                                 const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 7, 0, 0);
 
-                                for (let i = 0; i < 42; i++) {
+                                for (let i = 0; i < totalCells; i++) {
                                     const d = new Date(currentDate);
                                     const isCurrentMonth = d.getMonth() === month;
                                     const isToday = (new Date()).toDateString() === d.toDateString();
@@ -438,7 +441,7 @@ function SelectDateTimeContent() {
                                         <button
                                             key={i}
                                             onClick={() => !isDisabled && setDate(d)}
-                                            className={`h-10 w-full flex items-center justify-center rounded-2xl text-xs font-semibold transition-all relative ${
+                                            className={`h-8 sm:h-9 w-full flex items-center justify-center rounded-xl sm:rounded-2xl text-xs font-semibold transition-all relative ${
                                                 !isCurrentMonth ? 'opacity-0 pointer-events-none' : ''
                                             } ${
                                                 isSelected
@@ -470,7 +473,7 @@ function SelectDateTimeContent() {
 
                 {/* Available Time Slots */}
                 <div className="w-full">
-                    <div className="flex items-center justify-between mb-3 px-1">
+                    <div className="flex items-center justify-between mb-2.5 px-1">
                         <h2 className="text-sm font-bold text-[#3e2723] flex items-center gap-2">
                             <svg className="w-4 h-4 text-[#5d4037]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -524,7 +527,7 @@ function SelectDateTimeContent() {
                                             key={slot}
                                             onClick={() => !isDisabled && setTime(slot)}
                                             disabled={isDisabled}
-                                            className={`rounded-2xl py-2.5 text-xs font-semibold transition-all border ${
+                                            className={`rounded-xl py-2 text-xs font-semibold transition-all border ${
                                                 isSelected
                                                     ? 'bg-[#5d4037] text-white border-[#5d4037] shadow-md shadow-[#5d4037]/20 scale-[1.02]'
                                                     : isDisabled
@@ -580,7 +583,15 @@ function SelectDateTimeContent() {
             </div>
 
             {/* Sticky Floating Bottom Bar */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] pb-[env(safe-area-inset-bottom,16px)] pt-3.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+            <div
+                className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+                style={{
+                    paddingTop: '12px',
+                    paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 16px))',
+                    transform: 'translateZ(0)',
+                    WebkitTransform: 'translateZ(0)',
+                }}
+            >
                 <div className="max-w-md mx-auto px-4 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                         <div className="text-[11px] text-[#8d6e63] font-medium">เวลานัดหมายที่เลือก</div>

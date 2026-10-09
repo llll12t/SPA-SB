@@ -625,7 +625,15 @@ function GeneralInfoContent() {
             </div>
 
             {/* Sticky Floating Bottom Bar */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] pb-[env(safe-area-inset-bottom,16px)] pt-3.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+            <div
+                className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e7e0da] shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+                style={{
+                    paddingTop: '12px',
+                    paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 16px))',
+                    transform: 'translateZ(0)',
+                    WebkitTransform: 'translateZ(0)',
+                }}
+            >
                 <div className="max-w-md mx-auto px-4 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                         <div className="text-[11px] text-[#8d6e63] font-medium">ยอดชำระสุทธิ</div>

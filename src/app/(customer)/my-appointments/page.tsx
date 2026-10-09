@@ -208,6 +208,32 @@ export default function MyAppointmentsPage() {
                                 <SpaFlowerIcon className="w-10 h-10 animate-spin" color="#5d4037" style={{ animationDuration: '3s' }} />
                                 <p className="text-xs text-[#8d6e63] mt-2 font-medium">กำลังโหลดรายการนัดหมาย...</p>
                             </div>
+                        ) : !profile?.userId ? (
+                            <div className="text-center py-12 px-6 bg-white rounded-3xl border border-[#e7e0da] shadow-sm">
+                                <div className="w-14 h-14 bg-[#faf8f5] rounded-full flex items-center justify-center mx-auto mb-3 border border-[#e7e0da]">
+                                    <SpaFlowerIcon className="w-7 h-7" color="#8d6e63" />
+                                </div>
+                                <h3 className="font-bold text-sm text-[#3e2723]">เข้าสู่ระบบเพื่อดูนัดหมาย</h3>
+                                <p className="text-xs text-[#8d6e63] mt-1 max-w-xs mx-auto">
+                                    กรุณาเข้าสู่ระบบผ่าน LINE เพื่อตรวจสอบรายการนัดหมายและประวัติของคุณ
+                                </p>
+                                <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-4">
+                                    {liff?.login && (
+                                        <button
+                                            onClick={() => liff.login()}
+                                            className="w-full sm:w-auto px-6 py-2.5 rounded-2xl text-xs font-bold bg-[#06C755] text-white hover:bg-[#05b34c] shadow-sm transition-all active:scale-95"
+                                        >
+                                            เข้าสู่ระบบด้วย LINE
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => router.push('/appointment')}
+                                        className="w-full sm:w-auto px-6 py-2.5 rounded-2xl text-xs font-bold bg-[#5d4037] text-white hover:bg-[#4a3429] shadow-sm transition-all active:scale-95"
+                                    >
+                                        จองบริการใหม่
+                                    </button>
+                                </div>
+                            </div>
                         ) : appointments.length === 0 ? (
                             <div className="text-center py-12 px-6 bg-white rounded-3xl border border-[#e7e0da] shadow-sm">
                                 <div className="w-14 h-14 bg-[#faf8f5] rounded-full flex items-center justify-center mx-auto mb-3 border border-[#e7e0da]">
