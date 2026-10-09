@@ -12,6 +12,10 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
     }
 
+    if (request.nextUrl.pathname === '/') {
+        return NextResponse.redirect(new URL('/appointment', request.url));
+    }
+
     return NextResponse.next();
 }
 
