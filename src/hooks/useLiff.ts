@@ -17,53 +17,37 @@ const useLiff = (liffId?: string) => {
     const isDevelopment = process.env.NODE_ENV === 'development';
 
     useEffect(() => {
+        let isMounted = true;
+
         const initializeLiff = async () => {
-            // 1. จัดการ Deep link (liff.state) ป้องกันการเกิด Redirect Loop
-            if (typeof window !== 'undefined') {
-                try {
-                    const params = new URLSearchParams(window.location.search);
-                    const rawLiffState = params.get('liff.state');
-                    if (rawLiffState) {
-                        let targetPath = rawLiffState;
-                        try {
-                            targetPath = decodeURIComponent(rawLiffState);
-                        } catch {
-                            targetPath = rawLiffState;
-                        }
+            // 1. ดึงค่า LIFF ID: ให้ความสำคัญกับค่าจากหน้าตั้งค่าระบบ (Admin Settings > ระบบ & การเชื่อมต่อ) เป็นอันดับแรก
+            let activeLiffId = (liffId || '').trim();
 
-                        if (!targetPath.startsWith('/')) {
-                            targetPath = `/${targetPath}`;
-                        }
-
-                        const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
-                        const destinationPath = targetPath.split('?')[0].replace(/\/$/, '') || '/';
-
-                        if (currentPath !== destinationPath) {
-                            window.location.replace(targetPath);
-                            return;
-                        } else {
-                            // ลบพารามิเตอร์ liff.state ออกจาก URL เพื่อไม่ให้ redirect ซ้ำ
-                            const cleanUrl = new URL(window.location.href);
-                            cleanUrl.searchParams.delete('liff.state');
-                            window.history.replaceState({}, '', cleanUrl.pathname + (cleanUrl.search || ''));
-                        }
-                    }
-                } catch (e) {
-                    console.error("useLiff deep link error:", e);
-                }
+            // ตรวจสอบจาก Cache ชั่วคราวใน session เพื่อให้เปิดหน้าได้ทันที ไม่ต้องรอเครือข่าย
+            if (!activeLiffId && typeof window !== 'undefined') {
+                activeLiffId = (sessionStorage.getItem('spa_liff_id_cache') || '').trim();
             }
 
-            // 2. ดึงค่า LIFF ID จาก Props, Env หรือ Supabase Settings
-            let activeLiffId = liffId || process.env.NEXT_PUBLIC_LIFF_ID;
+            // ดึงจากฐานข้อมูลหน้า Settings (settings -> notifications -> lineNotifications.liffId)
             if (!activeLiffId) {
                 try {
                     const snap = await getDoc(doc(db, 'settings', 'notifications'));
-                    if (snap.exists()) {
-                        activeLiffId = snap.data()?.lineNotifications?.liffId;
+                    const isPresent = typeof snap?.exists === 'function' ? snap.exists() : Boolean(snap?.exists);
+                    if (isPresent) {
+                        const data = snap.data();
+                        activeLiffId = (data?.lineNotifications?.liffId || '').trim();
+                        if (activeLiffId && typeof window !== 'undefined') {
+                            sessionStorage.setItem('spa_liff_id_cache', activeLiffId);
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to fetch LIFF ID from settings:", e);
                 }
+            }
+
+            // Fallback เผื่อกรณีไม่ได้กำหนดในหน้าตั้งค่า
+            if (!activeLiffId) {
+                activeLiffId = (process.env.NEXT_PUBLIC_LIFF_ID || '').trim();
             }
 
             const isLineApp = typeof window !== 'undefined' && /Line\//i.test(window.navigator.userAgent);
@@ -73,6 +57,7 @@ const useLiff = (liffId?: string) => {
                 console.warn("LIFF mock mode is active (Desktop development).");
                 const mockLiff = {
                     isInClient: () => false,
+                    isLoggedIn: () => true,
                     closeWindow: () => window.history.back(),
                     sendMessages: async (messages: any) => {
                         console.log('Mock: Messages sent:', messages);
@@ -86,26 +71,47 @@ const useLiff = (liffId?: string) => {
                         });
                     }
                 };
-                setLiffObject(mockLiff);
-                setProfile(MOCK_PROFILE);
-                setLoading(false);
+                if (isMounted) {
+                    setLiffObject(mockLiff);
+                    setProfile(MOCK_PROFILE);
+                    setLoading(false);
+                }
                 return;
             }
 
             if (!activeLiffId) {
-                setError("ยังไม่ได้ตั้งค่า LIFF ID (กรุณากำหนดในหน้าตั้งค่าระบบ > ระบบ & การเชื่อมต่อ)");
-                setLoading(false);
+                if (isMounted) {
+                    setError("ยังไม่ได้ตั้งค่า LIFF ID (กรุณากำหนดในหน้าตั้งค่าระบบ > ระบบ & การเชื่อมต่อ)");
+                    setLoading(false);
+                }
                 return;
             }
 
-            // 3. เริ่มต้นการทำงานของ LIFF SDK
+            // 2. โหลด LIFF SDK (ใช้ window.liff จาก CDN ก่อนเป็นลำดับแรกเพื่อเสถียรภาพสูงสุดบน iOS)
             try {
-                const liff = (await import('@line/liff')).default;
-                await liff.init({ liffId: activeLiffId });
+                let liff = (typeof window !== 'undefined' && (window as any).liff) || null;
+                if (!liff) {
+                    const liffModule = await import('@line/liff');
+                    liff = liffModule.default || liffModule;
+                }
+
+                // 3. เริ่มต้นการทำงานของ LIFF SDK โดยไม่ดัดแปลง URL ก่อน init
+                try {
+                    await liff.init({ liffId: activeLiffId });
+                } catch (initErr: any) {
+                    // หากเกิดข้อผิดพลาดในการโหลด extension ให้หน่วงเวลาและลองใหม่อีกครั้ง
+                    if (initErr?.message && initErr.message.includes('client features')) {
+                        console.warn("Retrying liff.init after extension delay...");
+                        await new Promise(r => setTimeout(r, 400));
+                        await liff.init({ liffId: activeLiffId });
+                    } else {
+                        throw initErr;
+                    }
+                }
+
                 await liff.ready;
 
-                // ⚠️ สำคัญมาก: ห้ามเรียก liff.login() ภายในแอป LINE (in-client) เด็ดขาด
-                // ให้เรียกเฉพาะกรณีเปิดใน External Browser (Chrome / Safari) เท่านั้น
+                // 4. ตรวจสอบสถานะ Login (เฉพาะ External Browser ห้ามเรียกในแอป LINE)
                 if (!liff.isInClient()) {
                     if (!liff.isLoggedIn()) {
                         liff.login({
@@ -115,7 +121,7 @@ const useLiff = (liffId?: string) => {
                     }
                 }
 
-                // 4. ดึงข้อมูล Profile อย่างปลอดภัย (พร้อม Fallback เผื่อสิทธิ์ scope profile ไม่ได้เปิด)
+                // 5. ดึงข้อมูล Profile อย่างปลอดภัย
                 let userProfile: any = null;
                 if (liff.isLoggedIn()) {
                     try {
@@ -127,7 +133,7 @@ const useLiff = (liffId?: string) => {
                             if (idToken) {
                                 userProfile = {
                                     userId: idToken.sub,
-                                    displayName: idToken.name || 'พนักงาน',
+                                    displayName: idToken.name || 'คุณลูกค้า',
                                     pictureUrl: idToken.picture
                                 };
                             }
@@ -137,15 +143,42 @@ const useLiff = (liffId?: string) => {
                     }
                 }
 
-                setProfile(userProfile);
-                setLiffObject(liff);
-                setError('');
+                if (isMounted) {
+                    setProfile(userProfile);
+                    setLiffObject(liff);
+                    setError('');
+                }
+
+                // 6. ตรวจสอบการเปลี่ยนเส้นทาง Deep link (liff.state) หลังจาก init สำเร็จเรียบร้อยแล้วเท่านั้น
+                if (typeof window !== 'undefined') {
+                    try {
+                        const params = new URLSearchParams(window.location.search);
+                        const rawLiffState = params.get('liff.state');
+                        if (rawLiffState) {
+                            let targetPath = decodeURIComponent(rawLiffState);
+                            if (!targetPath.startsWith('/')) {
+                                targetPath = `/${targetPath}`;
+                            }
+                            const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+                            const destinationPath = targetPath.split('?')[0].replace(/\/$/, '') || '/';
+
+                            if (currentPath !== destinationPath) {
+                                window.location.replace(targetPath);
+                                return;
+                            }
+                        }
+                    } catch (navErr) {
+                        console.warn("LIFF post-init navigation error:", navErr);
+                    }
+                }
 
             } catch (err: any) {
                 console.error("LIFF initialization failed:", err);
 
                 let userError = 'การเชื่อมต่อ LINE ไม่สมบูรณ์';
-                if (err?.message && err.message.includes('permission')) {
+                if (err?.message && err.message.includes('client features')) {
+                    userError = 'ไม่สามารถโหลดฟีเจอร์ LINE ได้ กรุณารีเฟรชหรือเปิดใหม่อีกครั้ง';
+                } else if (err?.message && err.message.includes('permission')) {
                     userError = 'สิทธิ์การเข้าถึง LINE ไม่เพียงพอ (กรุณาตรวจสอบ Scope ใน LINE Developers)';
                 } else if (err?.message && err.message.includes('scope')) {
                     userError = 'การตั้งค่า Scopes ใน LIFF ไม่ถูกต้อง';
@@ -153,23 +186,32 @@ const useLiff = (liffId?: string) => {
                     userError = `ข้อผิดพลาด LIFF: ${err.message}`;
                 }
 
-                setError(userError);
+                if (isMounted) {
+                    setError(userError);
 
-                if (isDevelopment) {
-                    console.warn('Setting up fallback mock data for development');
-                    setLiffObject({
-                        isInClient: () => false,
-                        closeWindow: () => window.history.back(),
-                        sendMessages: async () => console.log('Mock: Messages sent (fallback)')
-                    });
-                    setProfile(MOCK_PROFILE);
+                    if (isDevelopment) {
+                        console.warn('Setting up fallback mock data for development');
+                        setLiffObject({
+                            isInClient: () => false,
+                            isLoggedIn: () => true,
+                            closeWindow: () => window.history.back(),
+                            sendMessages: async () => console.log('Mock: Messages sent (fallback)')
+                        });
+                        setProfile(MOCK_PROFILE);
+                    }
                 }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         initializeLiff();
+
+        return () => {
+            isMounted = false;
+        };
     }, [liffId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return { liff: liffObject, profile, loading, error };

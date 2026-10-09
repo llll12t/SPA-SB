@@ -2,7 +2,7 @@ import { Barlow, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/app/components/Toast";
 import type { Metadata, Viewport } from "next";
-import LiffRedirectHandler from "@/app/components/LiffRedirectHandler";
+import Script from "next/script";
 
 const barlow = Barlow({
   weight: ['400', '500', '700'],
@@ -37,9 +37,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <Script
+          src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={`${barlow.variable} ${notoSansThai.variable} antialiased bg-[var(--background)] text-foreground`}>
         <ToastProvider>
-          <LiffRedirectHandler />
           {children}
         </ToastProvider>
       </body>
