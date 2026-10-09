@@ -378,6 +378,11 @@ VALUES
             "paymentInvoice": true,
             "dailyAppointmentNotification": true
         }
+    }'::JSONB, NOW()),
+
+    ('system', '{
+        "appUrl": "",
+        "cronSecret": "your-secure-cron-secret"
     }'::JSONB, NOW())
 ON CONFLICT (id) DO NOTHING;
 
@@ -387,5 +392,101 @@ ON CONFLICT (id) DO NOTHING;
 -- หมายเหตุ: ทาง Supabase ไม่อนุญาตให้ทำ INSERT ลง auth.users โดยตรงผ่าน SQL
 -- เพราะระบบ GoTrue Auth ต้องการ auth.identities และฟิลด์ภายในเฉพาะ
 -- ในการสร้าง Admin แนะนำให้รันคำสั่ง: node scripts/create-admin.mjs
+
+-- ==============================================================================
+-- SUPABASE CRON JOBS (pg_cron + pg_net แบบ Auto-Configured)
+-- ==============================================================================
+-- รันไฟล์นี้จบในครั้งเดียวได้ทันที! ระบบจะดึง URL และ CRON_SECRET จากตาราง settings อัตโนมัติ
+-- เมื่อเว็บเปิดใช้งาน ระบบจะซิงค์ URL เว็บจริงลงใน settings ให้เองโดยไม่ต้องแก้ SQL นี้เลย
+
+-- 1. เปิด Extensions ที่จำเป็น
+CREATE EXTENSION IF NOT EXISTS "pg_cron";
+CREATE EXTENSION IF NOT EXISTS "pg_net";
+
+-- 2. ฟังก์ชันเรียก API แจ้งเตือนล่วงหน้า 1 ชั่วโมง (ดึงค่าจาก settings อัตโนมัติ)
+CREATE OR REPLACE FUNCTION public.trigger_scheduled_reminders()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_app_url TEXT;
+    v_cron_secret TEXT;
+BEGIN
+    SELECT data->>'appUrl', data->>'cronSecret'
+    INTO v_app_url, v_cron_secret
+    FROM public.settings
+    WHERE id = 'system';
+
+    -- ยิงแจ้งเตือนเมื่อมีการระบุ URL ของเว็บเรียบร้อยแล้ว
+    IF v_app_url IS NOT NULL AND v_app_url <> '' AND v_app_url NOT LIKE '%localhost%' THEN
+        PERFORM net.http_get(
+            url := rtrim(v_app_url, '/') || '/api/cron/send-reminders',
+            headers := jsonb_build_object(
+                'Content-Type', 'application/json',
+                'Authorization', 'Bearer ' || COALESCE(v_cron_secret, '')
+            )
+        );
+    END IF;
+END;
+$$;
+
+-- 3. ฟังก์ชันเรียก API แจ้งเตือนสรุปคิวประจำวัน (ดึงค่าจาก settings อัตโนมัติ)
+CREATE OR REPLACE FUNCTION public.trigger_daily_notifications()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_app_url TEXT;
+    v_cron_secret TEXT;
+BEGIN
+    SELECT data->>'appUrl', data->>'cronSecret'
+    INTO v_app_url, v_cron_secret
+    FROM public.settings
+    WHERE id = 'system';
+
+    -- ยิงแจ้งเตือนเมื่อมีการระบุ URL ของเว็บเรียบร้อยแล้ว
+    IF v_app_url IS NOT NULL AND v_app_url <> '' AND v_app_url NOT LIKE '%localhost%' THEN
+        PERFORM net.http_get(
+            url := rtrim(v_app_url, '/') || '/api/cron/send-daily-notifications',
+            headers := jsonb_build_object(
+                'Content-Type', 'application/json',
+                'Authorization', 'Bearer ' || COALESCE(v_cron_secret, '')
+            )
+        );
+    END IF;
+END;
+$$;
+
+-- 4. ตั้งเวลา Cron Jobs (ปลอดภัย รันซ้ำได้ไม่เกิด Error)
+DO $$
+BEGIN
+    BEGIN
+        PERFORM cron.unschedule('send-appointment-reminders');
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+
+    BEGIN
+        PERFORM cron.unschedule('send-daily-appointment-notifications');
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+
+    -- ตั้งเตือนล่วงหน้า 1 ชั่วโมง (รันทุกต้นชั่วโมง นาทีที่ 00)
+    PERFORM cron.schedule(
+        'send-appointment-reminders',
+        '0 * * * *',
+        'SELECT public.trigger_scheduled_reminders();'
+    );
+
+    -- ตั้งเตือนสรุปคิวประจำวัน (รันทุกเช้า 08:00 น. ตามเวลาไทย = 01:00 UTC)
+    PERFORM cron.schedule(
+        'send-daily-appointment-notifications',
+        '0 1 * * *',
+        'SELECT public.trigger_daily_notifications();'
+    );
+END $$;
+
+
 
 
