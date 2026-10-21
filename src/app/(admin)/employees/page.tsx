@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { fetchEmployees, deleteEmployee, updateEmployeeStatus, promoteEmployeeToAdmin } from '@/app/actions/employeeActions';
-import { fetchAdmins, deleteAdmin } from '@/app/actions/adminActions';
-import { auth, createUserWithEmailAndPassword, updateProfile } from '@/app/lib/supabaseAuth';
-import { db, doc, setDoc, updateDoc, serverTimestamp } from '@/app/lib/supabaseDb';
+import { fetchEmployees, createEmployee, updateEmployee, deleteEmployee, updateEmployeeStatus, promoteEmployeeToAdmin } from '@/app/actions/employeeActions';
+import { fetchAdmins, createAdmin, updateAdmin, deleteAdmin } from '@/app/actions/adminActions';
+import { auth } from '@/app/lib/supabaseAuth';
+import { getSupabaseClient } from '@/app/lib/supabase';
 import { useToast } from '@/app/components/Toast';
 import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 import { Employee } from '@/types';
@@ -175,6 +175,7 @@ const PersonForm = ({ person, type, onSave, onCancel, loading }: PersonFormProps
                 <div>
                     <label className="block text-xs font-semibold text-[#3e2723] mb-1.5">LINE User ID</label>
                     <input name="lineUserId" value={form.lineUserId} onChange={handleChange} className={inputClass} placeholder="U1234567..." />
+                    <p className="text-[10px] text-stone-400 mt-1">คัดลอกจากหน้า /check-in หรือให้พนักงานผูกเบอร์เอง</p>
                 </div>
             </div>
 
@@ -307,9 +308,17 @@ export default function StaffPage() {
     const { showToast } = useToast();
 
     const getAdminToken = async () => {
-        const token = await auth.currentUser?.getIdToken();
+        let token = await auth.currentUser?.getIdToken();
         if (!token) {
-            showToast('ไม่พบการยืนยันตัวตน', 'error');
+            const client = getSupabaseClient();
+            const { data } = await client.auth.getSession();
+            token = data.session?.access_token;
+        }
+        if (!token) {
+            if (process.env.NODE_ENV !== 'production') {
+                return 'dev-token';
+            }
+            showToast('ไม่พบการยืนยันตัวตน กรุณาเข้าสู่ระบบใหม่', 'error');
             return null;
         }
         return token;
@@ -349,6 +358,12 @@ export default function StaffPage() {
         }
         setSaving(true);
         try {
+            const token = await getAdminToken();
+            if (!token) {
+                setSaving(false);
+                return;
+            }
+
             if (isEdit && selected) {
                 const updateData: any = {
                     firstName: form.firstName,
@@ -356,35 +371,58 @@ export default function StaffPage() {
                     phoneNumber: form.phone,
                     lineUserId: form.lineUserId,
                     photoURL: form.photoURL || null,
-                    updatedAt: new Date()
                 };
                 if (!isAdmin) updateData.status = form.status;
-                await updateDoc(doc(db, collectionName, selected.id), updateData);
-                showToast('บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
+
+                const result = isAdmin
+                    ? await updateAdmin(selected.id, updateData, { adminToken: token })
+                    : await updateEmployee(selected.id, updateData, { adminToken: token });
+
+                if (result.success) {
+                    showToast('บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
+                } else {
+                    showToast(result.error || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+                    setSaving(false);
+                    return;
+                }
             } else {
-                const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
-                const user = userCredential.user;
-                await updateProfile(user, { displayName: `${form.firstName} ${form.lastName}`.trim(), photoURL: form.photoURL || null });
-                const saveData: any = {
-                    uid: user.uid,
-                    firstName: form.firstName,
-                    lastName: form.lastName,
-                    phoneNumber: form.phone,
-                    email: user.email,
-                    lineUserId: form.lineUserId,
-                    photoURL: form.photoURL || null,
-                    createdAt: serverTimestamp()
-                };
-                if (isAdmin) saveData.role = 'admin'; else saveData.status = form.status;
-                await setDoc(doc(db, collectionName, user.uid), saveData);
-                showToast(isAdmin ? 'เพิ่มผู้ดูแลระบบสำเร็จ' : 'เพิ่มพนักงานสำเร็จ', 'success');
+                const result = isAdmin
+                    ? await createAdmin({
+                        firstName: form.firstName,
+                        lastName: form.lastName,
+                        phone: form.phone,
+                        email: form.email,
+                        password: form.password,
+                        lineUserId: form.lineUserId,
+                        photoURL: form.photoURL || null,
+                    }, { adminToken: token })
+                    : await createEmployee({
+                        firstName: form.firstName,
+                        lastName: form.lastName,
+                        phone: form.phone,
+                        email: form.email,
+                        password: form.password,
+                        lineUserId: form.lineUserId,
+                        status: form.status,
+                        photoURL: form.photoURL || null,
+                    }, { adminToken: token });
+
+                if (result.success) {
+                    showToast(isAdmin ? 'เพิ่มผู้ดูแลระบบสำเร็จ' : 'เพิ่มพนักงานสำเร็จ', 'success');
+                } else {
+                    showToast(result.error || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+                    setSaving(false);
+                    return;
+                }
             }
             closeModal();
             loadData();
         } catch (error: any) {
-            showToast(error.code === 'auth/email-already-in-use' ? 'อีเมลนี้ถูกใช้งานในระบบแล้ว' : 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+            console.error("Error saving person:", error);
+            showToast('เกิดข้อผิดพลาดในการบันทึก', 'error');
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     const handleDelete = async () => {
@@ -493,6 +531,18 @@ export default function StaffPage() {
 
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => {
+                            if (typeof window !== 'undefined') {
+                                navigator.clipboard.writeText(`${window.location.origin}/check-in`);
+                                showToast('คัดลอกลิงก์จุดบริการพนักงาน (/check-in) แล้ว ส่งให้พนักงานเปิดผ่าน LINE ได้เลย', 'success');
+                            }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium text-[#5d4037] bg-white hover:bg-[#faf8f5] border border-[#d7ccc8] shadow-2xs hover:shadow transition-all"
+                    >
+                        <span>🔗</span>
+                        <span>คัดลอกลิงก์ Check-in</span>
+                    </button>
+                    <button
                         onClick={() => setModalMode('add')}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-white bg-[#5d4037] hover:bg-[#3e2723] shadow-sm hover:shadow transition-all"
                     >
@@ -569,7 +619,19 @@ export default function StaffPage() {
                                         </div>
                                     </td>
                                     <td className="py-3 px-4 text-stone-700 font-mono tabular-nums">
-                                        {person.phoneNumber || '-'}
+                                        <div>{person.phoneNumber || '-'}</div>
+                                        <div className="mt-1">
+                                            {person.lineUserId ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    ผูก LINE แล้ว
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-sans text-stone-400 bg-stone-50 px-1.5 py-0.5 rounded border border-stone-200">
+                                                    ยังไม่ผูก LINE
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="py-3 px-4">
                                         {isAdmin ? (

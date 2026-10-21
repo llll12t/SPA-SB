@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLiffContext } from '@/context/LiffProvider';
-import { findAppointmentsByPhone, findAppointmentById } from '@/app/actions/employeeActions';
+import {
+    findAppointmentsByPhone,
+    findAppointmentById,
+    checkEmployeeStatusByLineId,
+    registerLineIdToEmployee
+} from '@/app/actions/employeeActions';
 import EmployeeHeader from '@/app/components/EmployeeHeader';
 import { useToast } from '@/app/components/Toast';
 import { Appointment } from '@/types';
@@ -10,14 +15,94 @@ import { useRouter } from 'next/navigation';
 import AppointmentCard from './components/AppointmentCard';
 
 export default function CheckInPage() {
-    const { liff, loading: liffLoading } = useLiffContext();
+    const { liff, profile, loading: liffLoading } = useLiffContext();
     const [phoneNumber, setPhoneNumber] = useState('');
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
+    // Employee Connection State
+    const [isLinked, setIsLinked] = useState<boolean | null>(null);
+    const [employeeInfo, setEmployeeInfo] = useState<{ id: string; firstName: string; lastName: string; role: string } | null>(null);
+    const [showConnectModal, setShowConnectModal] = useState(false);
+    const [linkPhone, setLinkPhone] = useState('');
+    const [isLinking, setIsLinking] = useState(false);
+    const [copiedId, setCopiedId] = useState(false);
+
     const router = useRouter();
     const { showToast } = useToast();
+
+    // Verify employee link status on load
+    const verifyEmployeeLink = useCallback(async (lineUserId: string) => {
+        try {
+            const status = await checkEmployeeStatusByLineId(lineUserId);
+            if (status.isLinked && status.employee) {
+                setIsLinked(true);
+                setEmployeeInfo(status.employee);
+            } else {
+                setIsLinked(false);
+                setEmployeeInfo(null);
+            }
+        } catch (err) {
+            console.error("Error verifying employee link:", err);
+            setIsLinked(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (profile?.userId) {
+            verifyEmployeeLink(profile.userId);
+        }
+    }, [profile?.userId, verifyEmployeeLink]);
+
+    const handleConnectAccount = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!linkPhone.trim()) {
+            showToast('กรุณากรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้', 'error');
+            return;
+        }
+        if (!profile?.userId) {
+            showToast('ไม่พบข้อมูลบัญชี LINE กรุณาเปิดผ่านแอปพลิเคชัน LINE', 'error');
+            return;
+        }
+
+        setIsLinking(true);
+        try {
+            const res = await registerLineIdToEmployee(linkPhone, profile.userId);
+            if (res.success) {
+                showToast(res.message || 'เชื่อมต่อบัญชีสำเร็จ!', 'success');
+                setIsLinked(true);
+                if (res.employee) {
+                    setEmployeeInfo({
+                        id: res.employee.id,
+                        firstName: res.employee.firstName,
+                        lastName: res.employee.lastName || '',
+                        role: (res.employee as any).role || 'employee'
+                    });
+                }
+                setShowConnectModal(false);
+                setLinkPhone('');
+            } else {
+                showToast(res.error || 'ไม่สามารถเชื่อมต่อได้', 'error');
+            }
+        } catch (err: any) {
+            showToast(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+        } finally {
+            setIsLinking(false);
+        }
+    };
+
+    const handleCopyLineId = async () => {
+        if (!profile?.userId) return;
+        try {
+            await navigator.clipboard.writeText(profile.userId);
+            setCopiedId(true);
+            showToast('คัดลอก LINE User ID เรียบร้อยแล้ว', 'success');
+            setTimeout(() => setCopiedId(false), 3000);
+        } catch {
+            showToast('ไม่สามารถคัดลอกได้โดยอัตโนมัติ', 'error');
+        }
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -85,9 +170,50 @@ export default function CheckInPage() {
 
     return (
         <div className="min-h-screen bg-[#faf8f5]">
-            <EmployeeHeader />
+            <EmployeeHeader
+                employeeName={employeeInfo ? `${employeeInfo.firstName} ${employeeInfo.lastName || ''}`.trim() : undefined}
+                isLinked={isLinked ?? true}
+                roleLabel={employeeInfo?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'พนักงานบริการ'}
+                onConnectClick={() => setShowConnectModal(true)}
+            />
 
             <div className="max-w-xl mx-auto px-4 py-5 space-y-4.5">
+                {/* Unlinked Employee Banner */}
+                {isLinked === false && (
+                    <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 shadow-2xs space-y-3 animate-in fade-in">
+                        <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-800 shrink-0 text-base font-bold">
+                                ⚠️
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-bold text-[#3e2723]">
+                                    บัญชี LINE ยังไม่ได้เชื่อมต่อกับระบบพนักงาน
+                                </h3>
+                                <p className="text-xs text-[#8d6e63] mt-0.5 leading-relaxed">
+                                    กรุณาเชื่อมต่อด้วยเบอร์โทรศัพท์ที่ลงทะเบียนไว้ หรือส่ง LINE User ID ให้แอดมิน เพื่อเริ่มเช็คอินคิวลูกค้า
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200/60">
+                            <button
+                                onClick={() => setShowConnectModal(true)}
+                                className="px-3.5 py-1.5 rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-xs shadow-2xs transition-all active:scale-95 flex items-center gap-1.5"
+                            >
+                                <span>🔗 เชื่อมต่อบัญชีด้วยเบอร์โทร</span>
+                            </button>
+                            {profile?.userId && (
+                                <button
+                                    onClick={handleCopyLineId}
+                                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-[#5d4037] border border-[#d7ccc8] font-semibold text-xs shadow-2xs transition-all active:scale-95 flex items-center gap-1.5"
+                                >
+                                    <span>{copiedId ? '✓ คัดลอกแล้ว' : '📋 คัดลอก LINE User ID'}</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Title Banner */}
                 <div className="pt-1">
                     <div className="flex items-center gap-1.5">
@@ -196,6 +322,79 @@ export default function CheckInPage() {
                     )}
                 </div>
             </div>
+
+            {/* Employee Connection Modal */}
+            {showConnectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+                    <div className="bg-white rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-xl border border-[#e7e0da] space-y-4">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#f0eae4]">
+                            <div className="flex items-center gap-2">
+                                <span className="text-base">🔗</span>
+                                <h3 className="text-sm sm:text-base font-bold text-[#3e2723]">เชื่อมต่อบัญชีพนักงาน</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowConnectModal(false)}
+                                className="text-stone-400 hover:text-stone-600 p-1 rounded-lg text-sm"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-[#8d6e63] leading-relaxed">
+                            กรอกเบอร์โทรศัพท์ของคุณที่แอดมินลงทะเบียนไว้ในระบบ เพื่อผูกบัญชี LINE นี้เข้ากับข้อมูลพนักงาน
+                        </p>
+
+                        <form onSubmit={handleConnectAccount} className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-[#3e2723] mb-1.5">
+                                    เบอร์โทรศัพท์พนักงานที่ลงทะเบียนไว้
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={linkPhone}
+                                    onChange={(e) => setLinkPhone(e.target.value)}
+                                    placeholder="เช่น 0812345678"
+                                    className="w-full px-3.5 py-2.5 bg-white border border-[#d7ccc8] rounded-xl text-sm font-mono text-[#3e2723] placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#5d4037]/20 focus:border-[#5d4037]"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isLinking || !linkPhone.trim()}
+                                className="w-full py-2.5 rounded-xl bg-[#5d4037] hover:bg-[#3e2723] text-white font-bold text-xs shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isLinking ? (
+                                    <>
+                                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>กำลังเชื่อมต่อ...</span>
+                                    </>
+                                ) : (
+                                    <span>ยืนยันการเชื่อมต่อ</span>
+                                )}
+                            </button>
+                        </form>
+
+                        {/* Manual LINE ID option */}
+                        <div className="pt-3 border-t border-[#f0eae4] space-y-1.5">
+                            <div className="text-[11px] font-semibold text-[#8d6e63]">หรือส่ง LINE User ID ให้แอดมิน:</div>
+                            <div className="flex items-center gap-2 bg-[#faf8f5] p-2 rounded-xl border border-[#e7e0da]">
+                                <span className="font-mono text-[11px] text-[#3e2723] truncate flex-1 select-all">
+                                    {profile?.userId || 'เปิดผ่านแอป LINE เพื่อดู ID'}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleCopyLineId}
+                                    disabled={!profile?.userId}
+                                    className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-stone-100 text-[#5d4037] border border-[#d7ccc8] rounded-lg shrink-0 transition-colors disabled:opacity-40"
+                                >
+                                    {copiedId ? '✓ คัดลอกแล้ว' : 'คัดลอก'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

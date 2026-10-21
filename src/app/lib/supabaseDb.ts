@@ -545,6 +545,76 @@ function sanitizeRecordData(table: string, data: any): any {
     return sanitized;
 }
 
+function expandDotNotationAndSpecials(data: any, existingData: any = {}): any {
+    if (!data || typeof data !== 'object') return data;
+
+    const result: any = {};
+    const nestedToMerge: Record<string, any> = {};
+
+    for (const key of Object.keys(data)) {
+        const val = data[key];
+
+        if (key.includes('.')) {
+            const parts = key.split('.');
+            const root = parts[0];
+
+            if (!nestedToMerge[root]) {
+                const existingRoot = existingData && existingData[root];
+                nestedToMerge[root] = (existingRoot && typeof existingRoot === 'object' && !Array.isArray(existingRoot))
+                    ? JSON.parse(JSON.stringify(existingRoot))
+                    : {};
+            }
+
+            let curr = nestedToMerge[root];
+            for (let i = 1; i < parts.length - 1; i++) {
+                const p = parts[i];
+                if (!curr[p] || typeof curr[p] !== 'object' || Array.isArray(curr[p])) {
+                    curr[p] = {};
+                }
+                curr = curr[p];
+            }
+
+            const leaf = parts[parts.length - 1];
+            if (val && typeof val === 'object' && val.__type === 'increment') {
+                const currentVal = Number(curr[leaf]) || 0;
+                curr[leaf] = currentVal + val.value;
+            } else if (val && typeof val === 'object' && val.__type === 'arrayUnion') {
+                const currentArr = Array.isArray(curr[leaf]) ? curr[leaf] : [];
+                curr[leaf] = Array.from(new Set([...currentArr, ...val.elements]));
+            } else if (val && typeof val === 'object' && val.__type === 'arrayRemove') {
+                const currentArr = Array.isArray(curr[leaf]) ? curr[leaf] : [];
+                curr[leaf] = currentArr.filter((item: any) => !val.elements.includes(item));
+            } else {
+                curr[leaf] = val;
+            }
+        } else {
+            if (val && typeof val === 'object' && val.__type === 'increment') {
+                const currentVal = Number(existingData?.[key]) || 0;
+                result[key] = currentVal + val.value;
+            } else if (val && typeof val === 'object' && val.__type === 'arrayUnion') {
+                const currentArr = Array.isArray(existingData?.[key]) ? existingData[key] : [];
+                result[key] = Array.from(new Set([...currentArr, ...val.elements]));
+            } else if (val && typeof val === 'object' && val.__type === 'arrayRemove') {
+                const currentArr = Array.isArray(existingData?.[key]) ? existingData[key] : [];
+                result[key] = currentArr.filter((item: any) => !val.elements.includes(item));
+            } else {
+                result[key] = val;
+            }
+        }
+    }
+
+    // Merge nested root objects into result
+    for (const root of Object.keys(nestedToMerge)) {
+        if (result[root] && typeof result[root] === 'object' && !Array.isArray(result[root])) {
+            result[root] = { ...nestedToMerge[root], ...result[root] };
+        } else {
+            result[root] = nestedToMerge[root];
+        }
+    }
+
+    return result;
+}
+
 export async function setDoc(docRef: DocRef, data: any, options?: { merge?: boolean }): Promise<void> {
     const client = getClient();
     const table = docRef.collectionName;
@@ -554,8 +624,9 @@ export async function setDoc(docRef: DocRef, data: any, options?: { merge?: bool
             let finalData = data;
             if (options?.merge) {
                 const existing = await fetchDocSnapshot(docRef, false);
-                const current = existing.exists ? existing.data() : {};
-                finalData = { ...current, ...data };
+                const current = existing.exists ? (existing.data() || {}) : {};
+                const expanded = expandDotNotationAndSpecials(data, current);
+                finalData = { ...current, ...expanded };
             }
             const { error } = await client
                 .from('settings')
@@ -571,9 +642,9 @@ export async function setDoc(docRef: DocRef, data: any, options?: { merge?: bool
 
         if (options?.merge) {
             const existing = await fetchDocSnapshot(docRef, false);
-            if (existing.exists) {
-                recordData = { ...existing.data(), ...recordData };
-            }
+            const current = existing.exists ? (existing.data() || {}) : {};
+            const expanded = expandDotNotationAndSpecials(recordData, current);
+            recordData = { ...current, ...expanded, id: docRef.id };
         }
 
         recordData = sanitizeRecordData(table, recordData);
@@ -614,8 +685,9 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
     try {
         if (docRef.isSettings) {
             const existing = await fetchDocSnapshot(docRef, false);
-            const current = existing.exists ? existing.data() : {};
-            const finalData = { ...current, ...data };
+            const current = existing.exists ? (existing.data() || {}) : {};
+            const expanded = expandDotNotationAndSpecials(data, current);
+            const finalData = { ...current, ...expanded };
 
             const { error } = await client
                 .from('settings')
@@ -624,20 +696,18 @@ export async function updateDoc(docRef: DocRef, data: any): Promise<void> {
             return;
         }
 
-        // Process special fields like increment
-        const updates: any = {};
-        for (const key of Object.keys(data)) {
-            const val = data[key];
-            if (val && typeof val === 'object' && val.__type === 'increment') {
-                const existing = await fetchDocSnapshot(docRef, false);
-                const currentVal = existing.exists ? (existing.data()?.[key] || 0) : 0;
-                updates[key] = currentVal + val.value;
-            } else {
-                updates[key] = val;
-            }
+        const hasDotKeys = Object.keys(data).some(k => k.includes('.'));
+        const hasSpecialOps = Object.values(data).some(v => v && typeof v === 'object' && ('__type' in (v as any)));
+
+        let existingData: any = {};
+        if (hasDotKeys || hasSpecialOps) {
+            const existingSnap = await fetchDocSnapshot(docRef, false);
+            existingData = existingSnap.exists ? (existingSnap.data() || {}) : {};
         }
 
+        const updates = expandDotNotationAndSpecials(data, existingData);
         const cleanUpdates = sanitizeRecordData(table, updates);
+
         let query = client.from(table).update(cleanUpdates).eq('id', docRef.id);
         if (docRef.customerId) {
             query = query.eq('customerId', docRef.customerId);

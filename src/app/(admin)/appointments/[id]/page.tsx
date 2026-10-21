@@ -42,6 +42,13 @@ function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod,
     const [method, setMethod] = useState(defaultMethod || 'เงินสด');
     const [saving, setSaving] = useState(false);
 
+    useEffect(() => {
+        if (open) {
+            setAmount(defaultAmount ?? '');
+            setMethod(defaultMethod || 'เงินสด');
+        }
+    }, [open, defaultAmount, defaultMethod]);
+
     if (!open) return null;
 
     return (
@@ -186,10 +193,22 @@ export default function AppointmentDetailPage() {
         try {
             const token = await getAdminToken();
             if (!token) return;
-            const result = await confirmAppointmentAndPaymentByAdmin(appointment.id, 'admin', { amount: Number(amount), method }, { adminToken: token });
+            const numAmount = Number(amount);
+            const result = await confirmAppointmentAndPaymentByAdmin(appointment.id, 'admin', { amount: numAmount, method }, { adminToken: token });
             if (result.success) {
                 showToast('อัพเดตการชำระเงินสำเร็จ', 'success');
                 setShowEditPayment(false);
+                setAppointment(prev => prev ? ({
+                    ...prev,
+                    status: 'confirmed',
+                    paymentInfo: {
+                        ...prev.paymentInfo,
+                        paymentStatus: 'paid',
+                        paymentMethod: method,
+                        amountPaid: numAmount,
+                        paidAt: new Date().toISOString()
+                    }
+                }) : null);
             } else showToast(`เกิดข้อผิดพลาด: ${result.error}`, 'error');
         } catch (err: any) { showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error'); }
     };
@@ -246,7 +265,16 @@ export default function AppointmentDetailPage() {
             const token = await getAdminToken();
             if (!token) return;
             const result = await sendInvoiceToCustomer(appointment.id, { adminToken: token });
-            if (result.success) showToast('ส่งลิงก์ชำระเงินทาง LINE แล้ว', 'success');
+            if (result.success) {
+                showToast('ส่งลิงก์ชำระเงินทาง LINE แล้ว', 'success');
+                setAppointment(prev => prev ? ({
+                    ...prev,
+                    paymentInfo: {
+                        ...prev.paymentInfo,
+                        paymentStatus: 'invoiced'
+                    }
+                }) : null);
+            }
             else throw new Error(result.error);
         } catch (err: any) { showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error'); }
         finally { setIsSendingInvoice(false); }
@@ -287,7 +315,7 @@ export default function AppointmentDetailPage() {
             <ConfirmationModal show={showDeleteConfirm} title="ยืนยันการลบการจอง" message="คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลการจองนี้อย่างถาวร?" onConfirm={handleDelete} onCancel={() => setShowDeleteConfirm(false)} isProcessing={deleting} />
             <ConfirmationModal show={!!statusChangeInfo} title="ยืนยันการเปลี่ยนสถานะ" message={`ต้องการปรับปรุงสถานะคิวเป็น "${statusChangeInfo?.statusLabel}" ใช่หรือไม่?`} onConfirm={confirmStatusChange} onCancel={() => setStatusChangeInfo(null)} isProcessing={updating} />
             <CompletionNoteModal open={showCompletionNote} onClose={() => setShowCompletionNote(false)} onSave={handleCompletionWithNote} customerName={appointment.customerInfo?.fullName || appointment.customerInfo?.name || 'ลูกค้า'} serviceInfo={serviceDetails || appointment.serviceInfo} />
-            <EditPaymentModal open={showEditPayment} onClose={() => setShowEditPayment(false)} onSave={handleSavePayment} defaultAmount={appointment.paymentInfo?.totalPrice} defaultMethod={appointment.paymentInfo?.paymentMethod} currencySymbol={profile.currencySymbol} />
+            <EditPaymentModal open={showEditPayment} onClose={() => setShowEditPayment(false)} onSave={handleSavePayment} defaultAmount={appointment.paymentInfo?.amountPaid ?? appointment.paymentInfo?.totalPrice} defaultMethod={appointment.paymentInfo?.paymentMethod} currencySymbol={profile.currencySymbol} />
 
             {/* Top Toolbar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -449,6 +477,9 @@ export default function AppointmentDetailPage() {
                                             <span className="text-amber-600 font-bold text-[11px]">รอชำระเงิน</span>
                                 } />
                                 <InfoRow label="ช่องทาง" value={appointment.paymentInfo?.paymentMethod || 'ไม่ระบุ'} />
+                                {(appointment.paymentInfo as any)?.amountPaid != null && (
+                                    <InfoRow label="ยอดที่ชำระแล้ว" value={`${formatPrice((appointment.paymentInfo as any).amountPaid)} ${profile.currencySymbol}`} />
+                                )}
                                 {(appointment.paymentInfo as any)?.paidAt && (
                                     <InfoRow label="เวลาที่จ่าย" value={format(safeDate((appointment.paymentInfo as any).paidAt), 'd MMM HH:mm น.', { locale: th })} />
                                 )}
@@ -467,7 +498,7 @@ export default function AppointmentDetailPage() {
                                     onClick={() => setShowEditPayment(true)} 
                                     className="w-full py-2.5 text-xs font-bold text-[#5D4037] hover:text-[#4a3429] bg-white border border-[#e8ddd7] hover:border-[#5D4037]/45 rounded-xl transition-all"
                                 >
-                                    รับเงินเข้าระบบ (Manual)
+                                    {appointment.paymentInfo?.paymentStatus === 'paid' ? 'แก้ไขข้อมูลการชำระเงิน (Manual)' : 'รับเงินเข้าระบบ (Manual)'}
                                 </button>
                         </div>
                     </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { db, FieldValue } from '@/app/lib/supabaseDb';
+import { supabaseAdmin } from '@/app/lib/supabaseAdmin';
 import { revalidatePath } from 'next/cache';
 import {
     sendBookingNotification
@@ -53,26 +54,130 @@ const requireEmployeeAuth = async (auth?: AuthContext) => {
 
 // --- Registration and Status Updates ---
 
-export async function registerLineIdToEmployee(phoneNumber: string, lineUserId: string) {
-    if (!phoneNumber || !lineUserId) {
-        return { success: false, error: 'Phone number and LINE User ID are required.' };
-    }
-    const employeesRef = db.collection('employees');
-    const q = employeesRef.where('phoneNumber', '==', phoneNumber).limit(1);
-    const snapshot = await q.get();
-
-    if (snapshot.empty) {
-        return { success: false, error: 'ไม่พบเบอร์โทรศัพท์นี้ในระบบ' };
-    }
-    const employeeDoc = snapshot.docs[0];
-    if (employeeDoc.data().lineUserId) {
-        return { success: false, error: 'เบอร์นี้ถูกผูกกับบัญชี LINE อื่นแล้ว' };
+export async function checkEmployeeStatusByLineId(lineUserId?: string) {
+    if (!lineUserId) {
+        return { isLinked: false, error: 'ไม่พบ LINE User ID' };
     }
 
     try {
-        await employeeDoc.ref.update({ lineUserId: lineUserId });
-        return { success: true, message: 'ยืนยันตัวตนสำเร็จ' };
-    } catch (error) {
+        // 1. ตรวจสอบในตาราง employees
+        const empSnap = await db.collection('employees').where('lineUserId', '==', lineUserId).limit(1).get();
+        if (!empSnap.empty) {
+            const empData = empSnap.docs[0].data();
+            return {
+                isLinked: true,
+                employee: {
+                    id: empSnap.docs[0].id,
+                    firstName: empData.firstName || '',
+                    lastName: empData.lastName || '',
+                    role: 'employee',
+                    phoneNumber: empData.phoneNumber || '',
+                    photoURL: empData.photoURL || null
+                }
+            };
+        }
+
+        // 2. ตรวจสอบในตาราง admins เผื่อแอดมินเป็นผู้ใช้งาน
+        const admSnap = await db.collection('admins').where('lineUserId', '==', lineUserId).limit(1).get();
+        if (!admSnap.empty) {
+            const admData = admSnap.docs[0].data();
+            return {
+                isLinked: true,
+                employee: {
+                    id: admSnap.docs[0].id,
+                    firstName: admData.firstName || '',
+                    lastName: admData.lastName || '',
+                    role: 'admin',
+                    phoneNumber: admData.phoneNumber || '',
+                    photoURL: admData.photoURL || null
+                }
+            };
+        }
+
+        return { isLinked: false };
+    } catch (error: any) {
+        console.error("Error checking employee LINE status:", error);
+        return { isLinked: false, error: error.message };
+    }
+}
+
+export async function registerLineIdToEmployee(phoneNumber: string, lineUserId: string) {
+    if (!phoneNumber || !lineUserId) {
+        return { success: false, error: 'กรุณากรอกเบอร์โทรศัพท์และระบุ LINE User ID' };
+    }
+
+    const cleanInputPhone = phoneNumber.replace(/[\s-()]/g, '');
+
+    try {
+        // ค้นหาในพนักงาน (employees)
+        const employeesSnap = await db.collection('employees').get();
+        const matchedEmpDoc = employeesSnap.docs.find((doc: any) => {
+            const data = doc.data();
+            const storedPhone = (data.phoneNumber || data.phone || '').replace(/[\s-()]/g, '');
+            return storedPhone === cleanInputPhone;
+        });
+
+        if (matchedEmpDoc) {
+            const empData = matchedEmpDoc.data();
+            if (empData.lineUserId === lineUserId) {
+                return {
+                    success: true,
+                    message: 'บัญชี LINE นี้เชื่อมต่อกับพนักงานท่านนี้เรียบร้อยแล้ว',
+                    employee: { id: matchedEmpDoc.id, firstName: empData.firstName, lastName: empData.lastName }
+                };
+            }
+            if (empData.lineUserId) {
+                return { success: false, error: 'เบอร์นี้ถูกผูกกับบัญชี LINE อื่นแล้ว (กรุณาแจ้งแอดมินเพื่อรีเซ็ต)' };
+            }
+
+            await matchedEmpDoc.ref.update({
+                lineUserId: lineUserId,
+                updatedAt: new Date().toISOString()
+            });
+
+            return {
+                success: true,
+                message: `เชื่อมต่อสำเร็จ! ยินดีต้อนรับคุณ ${empData.firstName}`,
+                employee: { id: matchedEmpDoc.id, firstName: empData.firstName, lastName: empData.lastName }
+            };
+        }
+
+        // ค้นหาในแอดมิน (admins) เผื่อแอดมินใช้เบอร์ตนเองผูก
+        const adminsSnap = await db.collection('admins').get();
+        const matchedAdmDoc = adminsSnap.docs.find((doc: any) => {
+            const data = doc.data();
+            const storedPhone = (data.phoneNumber || data.phone || '').replace(/[\s-()]/g, '');
+            return storedPhone === cleanInputPhone;
+        });
+
+        if (matchedAdmDoc) {
+            const admData = matchedAdmDoc.data();
+            if (admData.lineUserId === lineUserId) {
+                return {
+                    success: true,
+                    message: 'บัญชี LINE นี้เชื่อมต่อกับบัญชีผู้ดูแลระบบเรียบร้อยแล้ว',
+                    employee: { id: matchedAdmDoc.id, firstName: admData.firstName, lastName: admData.lastName, role: 'admin' }
+                };
+            }
+            if (admData.lineUserId) {
+                return { success: false, error: 'เบอร์นี้ถูกผูกกับบัญชี LINE อื่นแล้ว' };
+            }
+
+            await matchedAdmDoc.ref.update({
+                lineUserId: lineUserId,
+                updatedAt: new Date().toISOString()
+            });
+
+            return {
+                success: true,
+                message: `เชื่อมต่อสำเร็จ! ยินดีต้อนรับผู้ดูแลระบบ ${admData.firstName}`,
+                employee: { id: matchedAdmDoc.id, firstName: admData.firstName, lastName: admData.lastName, role: 'admin' }
+            };
+        }
+
+        return { success: false, error: 'ไม่พบเบอร์โทรศัพท์นี้ในระบบพนักงาน กรุณาตรวจสอบเบอร์ที่ลงทะเบียนไว้' };
+    } catch (error: any) {
+        console.error("Error registering line ID to employee:", error);
         return { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' };
     }
 }
@@ -120,31 +225,39 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
         await appointmentRef.update(updateData);
 
         // --- Conditional Notifications ---
-        if (appointmentData.userId) {
+        const recipientUserId = appointmentData.userId || appointmentData.customerInfo?.lineUserId;
+        if (recipientUserId) {
             const notificationPayload: any = {
                 ...appointmentData,
                 id: appointmentId,
                 appointmentId: appointmentId,
+                note: appointmentData.completionNote || appointmentData.note || '',
+                completionNote: appointmentData.completionNote || appointmentData.note || '',
             };
 
             if (newStatus === 'completed') {
                 const totalPrice = appointmentData.paymentInfo?.totalPrice || 0;
                 let totalPointsAwarded = 0;
                 if (totalPrice > 0) {
-                    const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                    const purchasePointsResult = await awardPointsForPurchase(recipientUserId, totalPrice);
                     if (purchasePointsResult.success) totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
                 }
-                const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+                const visitPointsResult = await awardPointsForVisit(recipientUserId);
                 if (visitPointsResult.success) totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
 
                 notificationPayload.totalPointsAwarded = totalPointsAwarded;
 
-                if (customerNotificationsEnabled && settingsData.customerNotifications?.serviceCompleted) {
-                    await sendServiceCompletedFlexMessage(appointmentData.userId, notificationPayload);
-                }
+                if (customerNotificationsEnabled) {
+                    const hasServiceCompleted = !!settingsData.customerNotifications?.serviceCompleted;
+                    const hasReviewRequest = !!settingsData.customerNotifications?.reviewRequest;
 
-                if (customerNotificationsEnabled && settingsData.customerNotifications?.reviewRequest) {
-                    await sendReviewFlexMessage(appointmentData.userId, notificationPayload);
+                    if (hasServiceCompleted && hasReviewRequest) {
+                        await sendServiceCompletedFlexMessage(recipientUserId, notificationPayload, { includeReviewButton: true });
+                    } else if (hasServiceCompleted) {
+                        await sendServiceCompletedFlexMessage(recipientUserId, notificationPayload, { includeReviewButton: false });
+                    } else if (hasReviewRequest) {
+                        await sendReviewFlexMessage(recipientUserId, notificationPayload);
+                    }
                 }
             }
         }
@@ -183,10 +296,14 @@ export async function updatePaymentStatusByEmployee(appointmentId: string, emplo
         const appointmentData: any = appointmentDoc.data();
         const settingsData: any = settings || {};
 
+        const currentPayment = appointmentData.paymentInfo || {};
         await appointmentRef.update({
-            'paymentInfo.paymentStatus': 'paid',
-            'paymentInfo.paidAt': FieldValue.serverTimestamp(),
-            'paymentInfo.paymentReceivedBy': effectiveEmployeeId,
+            paymentInfo: {
+                ...currentPayment,
+                paymentStatus: 'paid',
+                paidAt: FieldValue.serverTimestamp(),
+                paymentReceivedBy: effectiveEmployeeId,
+            },
             updatedAt: FieldValue.serverTimestamp()
         });
 
@@ -320,12 +437,168 @@ export async function promoteEmployeeToAdmin(employeeId: string, auth?: AuthCont
             transaction.delete(employeeRef);
         });
 
+        try {
+            await supabaseAdmin.auth.admin.updateUserById(employeeId, {
+                user_metadata: { role: 'admin' }
+            });
+        } catch (e) {
+            console.warn('Could not update auth role for promoted employee:', e);
+        }
+
         revalidatePath('/employees');
         revalidatePath(`/employees/${employeeId}`);
 
         return { success: true };
     } catch (error: any) {
         console.error("Error promoting employee:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function createEmployee(data: {
+    firstName: string;
+    lastName?: string;
+    phone: string;
+    email: string;
+    password: string;
+    lineUserId?: string;
+    status?: 'available' | 'on_leave' | 'suspended';
+    photoURL?: string | null;
+}, auth?: AuthContext) {
+    try {
+        const adminAuth = await requireAdminAuth(auth);
+        if (!adminAuth.ok) return { success: false, error: adminAuth.error };
+
+        if (!data.email || !data.password || !data.firstName || !data.phone) {
+            return { success: false, error: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' };
+        }
+
+        let userId: string;
+
+        // 1. Create auth user with supabaseAdmin
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: data.email,
+            password: data.password,
+            email_confirm: true,
+            user_metadata: {
+                displayName: `${data.firstName} ${data.lastName || ''}`.trim(),
+                photoURL: data.photoURL || null,
+                role: 'employee',
+            }
+        });
+
+        if (authError) {
+            console.error("Error creating auth user for employee:", authError);
+            if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
+                // Check if user already exists in auth but not in employees table (recovering from previous failed attempts)
+                const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+                const existingAuthUser = usersData?.users?.find(u => u.email?.toLowerCase() === data.email.toLowerCase());
+
+                if (existingAuthUser) {
+                    const empDoc = await db.collection('employees').doc(existingAuthUser.id).get();
+                    const admDoc = await db.collection('admins').doc(existingAuthUser.id).get();
+
+                    if (!empDoc.exists && !admDoc.exists) {
+                        // Orphaned auth user - update password and user_metadata
+                        await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, {
+                            password: data.password,
+                            email_confirm: true,
+                            user_metadata: {
+                                displayName: `${data.firstName} ${data.lastName || ''}`.trim(),
+                                photoURL: data.photoURL || null,
+                                role: 'employee'
+                            }
+                        });
+                        userId = existingAuthUser.id;
+                    } else {
+                        return { success: false, error: 'อีเมลนี้ถูกใช้งานในระบบแล้ว' };
+                    }
+                } else {
+                    return { success: false, error: 'อีเมลนี้ถูกใช้งานในระบบแล้ว' };
+                }
+            } else {
+                return { success: false, error: authError.message };
+            }
+        } else {
+            userId = authData.user.id;
+        }
+
+        // 2. Insert into employees collection
+        const employeeData = {
+            id: userId,
+            uid: userId,
+            firstName: data.firstName,
+            lastName: data.lastName || '',
+            phoneNumber: data.phone,
+            email: data.email,
+            lineUserId: data.lineUserId || null,
+            photoURL: data.photoURL || null,
+            role: 'employee',
+            status: data.status || 'available',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        const docRef = db.collection('employees').doc(userId);
+        await docRef.set(employeeData);
+
+        revalidatePath('/employees');
+        return { success: true, employee: employeeData };
+    } catch (error: any) {
+        console.error("Error in createEmployee:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateEmployee(employeeId: string, updateData: {
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    phone?: string;
+    lineUserId?: string;
+    status?: 'available' | 'on_leave' | 'suspended';
+    photoURL?: string | null;
+}, auth?: AuthContext) {
+    if (!employeeId || !updateData) {
+        return { success: false, error: 'Employee ID and update data are required.' };
+    }
+
+    try {
+        const adminAuth = await requireAdminAuth(auth);
+        if (!adminAuth.ok) return { success: false, error: adminAuth.error };
+
+        const docRef = db.collection('employees').doc(employeeId);
+        const cleanData: any = {
+            ...updateData,
+            phoneNumber: updateData.phoneNumber || updateData.phone,
+            updatedAt: new Date().toISOString()
+        };
+        delete cleanData.phone;
+
+        await docRef.update(cleanData);
+
+        // Update auth user metadata if name/photoURL changed
+        try {
+            const metadata: any = {};
+            if (updateData.firstName) {
+                metadata.displayName = `${updateData.firstName} ${updateData.lastName || ''}`.trim();
+            }
+            if (updateData.photoURL !== undefined) {
+                metadata.photoURL = updateData.photoURL;
+            }
+            if (Object.keys(metadata).length > 0) {
+                await supabaseAdmin.auth.admin.updateUserById(employeeId, {
+                    user_metadata: metadata
+                });
+            }
+        } catch (e) {
+            console.warn('Could not update auth user metadata:', e);
+        }
+
+        revalidatePath('/employees');
+        return { success: true };
+    } catch (error: any) {
+        console.error(`Error updating employee ${employeeId}:`, error);
         return { success: false, error: error.message };
     }
 }
@@ -345,8 +618,8 @@ export async function fetchEmployees(auth?: AuthContext) {
         }));
 
         const sortedEmployees = employees.sort((a: any, b: any) => {
-            const dateA = a.createdAt?.toDate() || 0;
-            const dateB = b.createdAt?.toDate() || 0;
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
             return dateB - dateA;
         });
 
@@ -368,6 +641,11 @@ export async function deleteEmployee(employeeId: string, auth?: AuthContext) {
 
         const docRef = db.collection('employees').doc(employeeId);
         await docRef.delete();
+        try {
+            await supabaseAdmin.auth.admin.deleteUser(employeeId);
+        } catch (e) {
+            console.warn(`Could not delete auth user ${employeeId}:`, e);
+        }
         revalidatePath('/employees');
         return { success: true };
     } catch (error: any) {
@@ -388,7 +666,7 @@ export async function updateEmployeeStatus(employeeId: string, status: string, a
         const docRef = db.collection('employees').doc(employeeId);
         await docRef.update({
             status: status,
-            updatedAt: new Date()
+            updatedAt: new Date().toISOString()
         });
         revalidatePath('/employees');
         return { success: true };

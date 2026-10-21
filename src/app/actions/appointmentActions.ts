@@ -291,37 +291,56 @@ export async function updateAppointmentStatusByAdmin(appointmentId: string, newS
 
         if (appSnap.exists) {
             const appointment = appSnap.data();
-            if (appointment && appointment.userId) {
+            const recipientUserId = appointment?.userId || appointment?.customerInfo?.lineUserId;
+
+            if (appointment && recipientUserId) {
                 const settingsData = settingsResult?.settings || {};
                 const notificationsEnabled = settingsData.allNotifications?.enabled;
                 const customerNotificationsEnabled = notificationsEnabled && settingsData.customerNotifications?.enabled;
 
+                // Award points before sending flex so points can be shown in the template
+                let totalPointsAwarded = 0;
+                if (newStatus === 'completed') {
+                    try {
+                        const price = appointment.paymentInfo?.totalPrice || 0;
+                        if (price > 0) {
+                            const purchaseRes = await awardPointsForPurchase(recipientUserId, price);
+                            if (purchaseRes.success && purchaseRes.pointsAwarded) totalPointsAwarded += purchaseRes.pointsAwarded;
+                        }
+                        const visitRes = await awardPointsForVisit(recipientUserId);
+                        if (visitRes.success && visitRes.pointsAwarded) totalPointsAwarded += visitRes.pointsAwarded;
+                    } catch (e) {
+                        console.error("Error awarding points:", e);
+                    }
+                }
+
                 if (customerNotificationsEnabled) {
+                    const payload = {
+                        ...appointment,
+                        id: appointmentId,
+                        appointmentId,
+                        note: note || appointment.completionNote,
+                        completionNote: note || appointment.completionNote,
+                        totalPointsAwarded
+                    };
+
                     if (newStatus === 'confirmed' && settingsData.customerNotifications?.appointmentConfirmed) {
-                        await sendAppointmentConfirmedFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
+                        await sendAppointmentConfirmedFlexMessage(recipientUserId, payload);
                     } else if (newStatus === 'completed') {
                         const hasServiceCompleted = !!settingsData.customerNotifications?.serviceCompleted;
                         const hasReviewRequest = !!settingsData.customerNotifications?.reviewRequest;
 
                         if (hasServiceCompleted && hasReviewRequest) {
                             // Consolidate into a single All-in-One Flex message with review button
-                            await sendServiceCompletedFlexMessage(appointment.userId, { ...appointment, id: appointmentId }, { includeReviewButton: true });
+                            const flexRes = await sendServiceCompletedFlexMessage(recipientUserId, payload, { includeReviewButton: true });
+                            if (!flexRes.success) console.warn("Failed to send service completed flex:", flexRes.error);
                         } else if (hasServiceCompleted) {
-                            await sendServiceCompletedFlexMessage(appointment.userId, { ...appointment, id: appointmentId }, { includeReviewButton: false });
+                            const flexRes = await sendServiceCompletedFlexMessage(recipientUserId, payload, { includeReviewButton: false });
+                            if (!flexRes.success) console.warn("Failed to send service completed flex:", flexRes.error);
                         } else if (hasReviewRequest) {
-                            await sendReviewFlexMessage(appointment.userId, { ...appointment, id: appointmentId });
+                            const flexRes = await sendReviewFlexMessage(recipientUserId, payload);
+                            if (!flexRes.success) console.warn("Failed to send review flex:", flexRes.error);
                         }
-                    }
-                }
-
-                // Award points (only on completed)
-                if (newStatus === 'completed') {
-                    try {
-                        const price = appointment.paymentInfo?.totalPrice || 0;
-                        await awardPointsForPurchase(appointment.userId, price);
-                        await awardPointsForVisit(appointment.userId);
-                    } catch (e) {
-                        console.error("Error awarding points:", e);
                     }
                 }
             }
@@ -340,19 +359,30 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId: string,
         const adminAuth = await requireAdminAuth(auth);
         if (!adminAuth.ok) return { success: false, error: adminAuth.error };
 
+        const appRef = db.collection('appointments').doc(appointmentId);
+        const appSnapBefore = await appRef.get();
+        if (!appSnapBefore.exists) {
+            return { success: false, error: 'ไม่พบข้อมูลการจอง' };
+        }
+        const currentApp = appSnapBefore.data() || {};
+        const currentPayment = currentApp.paymentInfo || {};
+
         const updateData = {
             status: 'confirmed',
-            'paymentInfo.paymentStatus': 'paid',
-            'paymentInfo.paymentMethod': data.method,
-            'paymentInfo.amountPaid': data.amount,
-            'paymentInfo.paidAt': FieldValue.serverTimestamp(),
+            paymentInfo: {
+                ...currentPayment,
+                paymentStatus: 'paid',
+                paymentMethod: data.method,
+                amountPaid: data.amount,
+                paidAt: FieldValue.serverTimestamp(),
+            },
             updatedAt: FieldValue.serverTimestamp(),
         };
 
-        await db.collection('appointments').doc(appointmentId).update(updateData);
+        await appRef.update(updateData);
 
         const [appSnap, settingsResult] = await Promise.all([
-            db.collection('appointments').doc(appointmentId).get(),
+            appRef.get(),
             settingsActions.getNotificationSettings()
         ]);
 
@@ -386,14 +416,19 @@ export async function sendInvoiceToCustomer(appointmentId: string, auth?: AuthCo
         const adminAuth = await requireAdminAuth(auth);
         if (!adminAuth.ok) return { success: false, error: adminAuth.error };
 
-        const appSnap = await db.collection('appointments').doc(appointmentId).get();
+        const appRef = db.collection('appointments').doc(appointmentId);
+        const appSnap = await appRef.get();
         if (!appSnap.exists) throw new Error("Appointment not found");
 
         const appointment = appSnap.data();
         if (!appointment?.userId) throw new Error("This appointment is not linked to a LINE user.");
 
-        await db.collection('appointments').doc(appointmentId).update({
-            'paymentInfo.paymentStatus': 'invoiced',
+        const currentPayment = appointment.paymentInfo || {};
+        await appRef.update({
+            paymentInfo: {
+                ...currentPayment,
+                paymentStatus: 'invoiced',
+            },
             updatedAt: FieldValue.serverTimestamp(),
         });
 

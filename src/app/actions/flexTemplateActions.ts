@@ -416,13 +416,14 @@ export async function createAppointmentConfirmedFlexTemplate(appointmentData: an
  * 5. Service Completed Flex Template (บริการเสร็จสมบูรณ์ - ไม่มี Header)
  */
 export async function createServiceCompletedFlexTemplate(appointmentData: any, options?: { includeReviewButton?: boolean }) {
-    const { id, appointmentId, serviceInfo, customerInfo, totalPointsAwarded, note } = appointmentData;
+    const { id, appointmentId, serviceInfo, customerInfo, totalPointsAwarded, note, completionNote } = appointmentData;
     const customerName = customerInfo?.fullName || customerInfo?.firstName || 'คุณลูกค้า';
     const serviceName = formatServiceName(serviceInfo);
     const safeId = (id || appointmentId || '').toString();
     const liffId = await getEffectiveLiffId();
     const reviewUri = buildLiffUrl(liffId, `/review/${safeId}`);
     const points = Number(totalPointsAwarded || 0);
+    const effectiveNote = (note || completionNote || appointmentData.note || appointmentData.completionNote || '').trim();
 
     const bubble: any = {
         type: "bubble",
@@ -450,17 +451,19 @@ export async function createServiceCompletedFlexTemplate(appointmentData: any, o
                         cornerRadius: "8px"
                     }
                 ] : []),
-                ...(note && note.trim() ? [
+                ...(effectiveNote ? [
                     {
                         type: "box",
                         layout: "vertical",
                         contents: [
-                            { type: "text", text: "หมายเหตุจากผู้ให้บริการ:", size: "xxs", color: "#777777" },
-                            { type: "text", text: note.trim(), size: "xs", color: "#333333", wrap: true, weight: "bold", margin: "xs" }
+                            { type: "text", text: "💬 ข้อความจากทางร้าน / คำแนะนำการดูแล:", size: "xxs", color: "#8D6E63", weight: "bold" },
+                            { type: "text", text: effectiveNote, size: "xs", color: "#3E2723", wrap: true, weight: "bold", margin: "xs" }
                         ],
                         margin: "md",
                         paddingAll: "12px",
-                        backgroundColor: "#F9F7F5",
+                        backgroundColor: "#FDF8F6",
+                        borderColor: "#E8DDD7",
+                        borderWidth: "1px",
                         cornerRadius: "8px"
                     }
                 ] : []),

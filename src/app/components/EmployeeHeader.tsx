@@ -4,7 +4,21 @@ import { useLiffContext } from '@/context/LiffProvider';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
-export default function EmployeeHeader({ showBackButton = false }: { showBackButton?: boolean }) {
+interface EmployeeHeaderProps {
+    showBackButton?: boolean;
+    employeeName?: string;
+    isLinked?: boolean;
+    roleLabel?: string;
+    onConnectClick?: () => void;
+}
+
+export default function EmployeeHeader({
+    showBackButton = false,
+    employeeName,
+    isLinked = true,
+    roleLabel = 'พนักงานบริการ',
+    onConnectClick
+}: EmployeeHeaderProps) {
     const { profile, loading, error } = useLiffContext();
     const router = useRouter();
 
@@ -63,25 +77,41 @@ export default function EmployeeHeader({ showBackButton = false }: { showBackBut
                         </div>
                     ) : (
                         <div className="w-10 h-10 rounded-full bg-[#f5f2ed] border border-[#d7ccc8] flex items-center justify-center text-[#5d4037] font-bold text-sm shrink-0">
-                            {profile?.displayName?.slice(0, 1) || 'พ'}
+                            {employeeName?.slice(0, 1) || profile?.displayName?.slice(0, 1) || 'พ'}
                         </div>
                     )}
 
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#5d4037] bg-[#f5f2ed] px-2 py-0.5 rounded-md border border-[#e7e0da]">
-                                พนักงานบริการ
+                                {roleLabel}
                             </span>
+                            {isLinked && (
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    เชื่อมต่อแล้ว
+                                </span>
+                            )}
                         </div>
                         <p className="font-bold text-sm text-[#3e2723] truncate mt-0.5">
-                            {profile?.displayName || 'ผู้ใช้งาน LINE'}
+                            {employeeName || profile?.displayName || 'ผู้ใช้งาน LINE'}
                         </p>
                     </div>
                 </div>
 
-                <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/70">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>ออนไลน์</span>
+                <div className="shrink-0 flex items-center gap-2">
+                    {isLinked ? (
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/70">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>ออนไลน์</span>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={onConnectClick}
+                            className="flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300 transition-colors shadow-2xs"
+                        >
+                            <span>⚠️ ยังไม่ผูกบัญชี</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </header>
