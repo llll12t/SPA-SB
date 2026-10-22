@@ -161,8 +161,11 @@ export default function AppointmentPage() {
                                     <img
                                         src={service.imageUrl}
                                         alt={service.serviceName || service.name}
+                                        loading="lazy"
+                                        decoding="async"
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
+
                                 ) : (
                                     <div className="w-full h-full flex flex-col items-center justify-center text-[#8d6e63] p-2">
                                         <SpaFlowerIcon className="w-8 h-8 opacity-40 mb-1" />

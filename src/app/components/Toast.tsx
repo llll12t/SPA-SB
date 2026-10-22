@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
 // Define the shape of a Toast
@@ -137,20 +137,34 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
 
     const shouldShowFloating = !isAdminRoute && !hasAdminBell && floatingToasts.length > 0;
 
+    const contextValue = useMemo(() => ({
+        showToast,
+        markAsRead,
+        markAllAsRead,
+        removeToast,
+        clearAllToasts,
+        toasts,
+        hasUnread,
+        latestToast,
+        dismissLatestToast,
+        registerAdminBell,
+        hasAdminBell
+    }), [
+        showToast,
+        markAsRead,
+        markAllAsRead,
+        removeToast,
+        clearAllToasts,
+        toasts,
+        hasUnread,
+        latestToast,
+        dismissLatestToast,
+        registerAdminBell,
+        hasAdminBell
+    ]);
+
     return (
-        <ToastContext.Provider value={{
-            showToast,
-            markAsRead,
-            markAllAsRead,
-            removeToast,
-            clearAllToasts,
-            toasts,
-            hasUnread,
-            latestToast,
-            dismissLatestToast,
-            registerAdminBell,
-            hasAdminBell
-        }}>
+        <ToastContext.Provider value={contextValue}>
             {children}
 
             {/* Simple Toast UI Overlay - ONLY for non-admin routes without Bell box */}

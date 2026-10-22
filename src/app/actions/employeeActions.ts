@@ -63,8 +63,12 @@ export async function checkEmployeeStatusByLineId(lineUserId?: string) {
     }
 
     try {
-        // 1. ตรวจสอบในตาราง employees
-        const { data: empData } = await supabaseAdmin.from('employees').select('*').eq('lineUserId', lineUserId).limit(1).maybeSingle();
+        // Query both employees and admins in parallel for instant response
+        const [{ data: empData }, { data: admData }] = await Promise.all([
+            supabaseAdmin.from('employees').select('id, firstName, lastName, phoneNumber, photoURL').eq('lineUserId', lineUserId).limit(1).maybeSingle(),
+            supabaseAdmin.from('admins').select('id, firstName, lastName, phoneNumber, photoURL').eq('lineUserId', lineUserId).limit(1).maybeSingle()
+        ]);
+
         if (empData) {
             return {
                 isLinked: true,
@@ -79,8 +83,6 @@ export async function checkEmployeeStatusByLineId(lineUserId?: string) {
             };
         }
 
-        // 2. ตรวจสอบในตาราง admins เผื่อแอดมินเป็นผู้ใช้งาน
-        const { data: admData } = await supabaseAdmin.from('admins').select('*').eq('lineUserId', lineUserId).limit(1).maybeSingle();
         if (admData) {
             return {
                 isLinked: true,
@@ -110,12 +112,13 @@ export async function registerLineIdToEmployee(phoneNumber: string, lineUserId: 
     const cleanInputPhone = phoneNumber.replace(/[\s-()]/g, '');
 
     try {
-        // ค้นหาในพนักงาน (employees)
-        const { data: employees } = await supabaseAdmin.from('employees').select('*');
-        const matchedEmp = employees?.find((emp: any) => {
-            const storedPhone = (emp.phoneNumber || emp.phone || '').replace(/[\s-()]/g, '');
-            return storedPhone === cleanInputPhone;
-        });
+        // 1. ค้นหาในพนักงาน (employees) แบบ Targeted Query
+        const { data: matchedEmp } = await supabaseAdmin
+            .from('employees')
+            .select('*')
+            .or(`phoneNumber.eq.${cleanInputPhone},phoneNumber.eq.${phoneNumber}`)
+            .limit(1)
+            .maybeSingle();
 
         if (matchedEmp) {
             if (matchedEmp.lineUserId === lineUserId) {
@@ -141,12 +144,13 @@ export async function registerLineIdToEmployee(phoneNumber: string, lineUserId: 
             };
         }
 
-        // ค้นหาในแอดมิน (admins) เผื่อแอดมินใช้เบอร์ตนเองผูก
-        const { data: admins } = await supabaseAdmin.from('admins').select('*');
-        const matchedAdm = admins?.find((adm: any) => {
-            const storedPhone = (adm.phoneNumber || adm.phone || '').replace(/[\s-()]/g, '');
-            return storedPhone === cleanInputPhone;
-        });
+        // 2. ค้นหาในแอดมิน (admins) แบบ Targeted Query
+        const { data: matchedAdm } = await supabaseAdmin
+            .from('admins')
+            .select('*')
+            .or(`phoneNumber.eq.${cleanInputPhone},phoneNumber.eq.${phoneNumber}`)
+            .limit(1)
+            .maybeSingle();
 
         if (matchedAdm) {
             if (matchedAdm.lineUserId === lineUserId) {
@@ -173,6 +177,7 @@ export async function registerLineIdToEmployee(phoneNumber: string, lineUserId: 
         }
 
         return { success: false, error: 'ไม่พบเบอร์โทรศัพท์นี้ในระบบพนักงาน กรุณาตรวจสอบเบอร์ที่ลงทะเบียนไว้' };
+
     } catch (error: any) {
         console.error("Error registering line ID to employee:", error);
         return { success: false, error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' };

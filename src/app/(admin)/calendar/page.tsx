@@ -182,14 +182,19 @@ export default function CalendarPage() {
 
         Object.values(byTech).forEach((apts: any) => {
             apts.sort((a: any, b: any) => (a.time || "").localeCompare(b.time || ""));
-            apts.forEach((apt: any, idx: number) => {
+            const intervals = apts.map((apt: any) => {
                 const start = parseTime(apt.time || "09:00");
-                const end = start + (apt.serviceInfo?.duration || apt.appointmentInfo?.duration || 60);
+                const duration = apt.serviceInfo?.duration || apt.appointmentInfo?.duration || 60;
+                return { start, end: start + duration };
+            });
+
+            apts.forEach((apt: any, idx: number) => {
+                const { start, end } = intervals[idx];
                 const overlapping = apts.filter(
-                    (o: any, i: number) =>
+                    (_: any, i: number) =>
                         i !== idx &&
-                        parseTime(o.time || "09:00") < end &&
-                        parseTime(o.time || "09:00") + (o.serviceInfo?.duration || o.appointmentInfo?.duration || 60) > start
+                        intervals[i].start < end &&
+                        intervals[i].end > start
                 );
                 apt._totalColumns = overlapping.length + 1;
                 const used = new Set(overlapping.map((o: any) => o._column).filter((c: any) => c !== undefined));

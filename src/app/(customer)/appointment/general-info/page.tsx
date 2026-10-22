@@ -296,28 +296,28 @@ function GeneralInfoContent() {
                 return;
             }
 
-            // Send Flex Message via liff.sendMessages()
+            // Send Flex Message non-blockingly in background so the user is immediately routed to /my-appointments
             if (liff && typeof liff.sendMessages === 'function') {
-                try {
-                    const { flexMessage } = await getNewBookingFlexJson({
-                        appointmentId: result.id!,
-                        serviceName: service.serviceName || service.id || 'บริการ',
-                        date: date!,
-                        time: time!,
-                        customerName: formData.fullName,
-                        totalPrice: finalPrice,
-                        addOns: (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).map(a => ({ name: a.name, price: a.price || 0 })),
-                        couponName: availableCoupons.find(c => c.id === selectedCouponId)?.name || null,
-                        discount: discount,
+                getNewBookingFlexJson({
+                    appointmentId: result.id!,
+                    serviceName: service.serviceName || service.id || 'บริการ',
+                    date: date!,
+                    time: time!,
+                    customerName: formData.fullName,
+                    totalPrice: finalPrice,
+                    addOns: (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).map(a => ({ name: a.name, price: a.price || 0 })),
+                    couponName: availableCoupons.find(c => c.id === selectedCouponId)?.name || null,
+                    discount: discount,
+                })
+                    .then(({ flexMessage }) => liff.sendMessages([flexMessage]))
+                    .catch((flexErr) => {
+                        console.warn('liff.sendMessages background dispatch failed (non-critical):', flexErr);
                     });
-                    await liff.sendMessages([flexMessage]);
-                } catch (flexErr) {
-                    console.warn('liff.sendMessages failed (non-critical):', flexErr);
-                }
             }
 
             showToast('จองสำเร็จ! กำลังพาไปหน้านัดหมาย', "success");
             router.push('/my-appointments');
+
 
         } catch (err) {
             showToast('เกิดข้อผิดพลาดในการจอง กรุณาลองอีกครั้ง', "error");

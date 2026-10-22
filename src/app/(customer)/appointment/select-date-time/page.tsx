@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db, collection, getDocs, query, where, orderBy, doc, getDoc } from '@/app/lib/supabaseDb';
 import { format } from 'date-fns';
@@ -116,62 +116,54 @@ function SelectDateTimeContent() {
     const [unavailableSlots, setUnavailableSlots] = useState<Set<string>>(new Set());
     const [appointmentsForDay, setAppointmentsForDay] = useState<any[]>([]);
 
-    // Fetch service data
+    // Single parallel initial data fetch via Promise.all (Service + Technicians + Booking Settings + Day Appointments)
     useEffect(() => {
-        if (!serviceId) return;
+        let isMounted = true;
+        setLoading(true);
 
-        const fetchService = async () => {
+        const fetchInitialData = async () => {
+            const initialDateStr = date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+
             try {
-                const docRef = doc(db, 'services', serviceId);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setService({ id: docSnap.id, ...docSnap.data() } as Service);
+                const [serviceSnap, techSnap, settingsSnap, apptSnap] = await Promise.all([
+                    serviceId ? getDoc(doc(db, 'services', serviceId)) : Promise.resolve(null),
+                    getDocs(query(
+                        collection(db, 'technicians'),
+                        where('status', '==', 'available'),
+                        orderBy('firstName')
+                    )),
+                    getDoc(doc(db, 'settings', 'booking')),
+                    getDocs(query(
+                        collection(db, 'appointments'),
+                        where('date', '==', initialDateStr),
+                        where('status', 'in', ['pending', 'confirmed', 'awaiting_confirmation'])
+                    ))
+                ]);
+
+                if (!isMounted) return;
+
+                // 1. Process Service
+                if (serviceSnap && serviceSnap.exists()) {
+                    const servData = { id: serviceSnap.id, ...serviceSnap.data() } as Service;
+                    setService(servData);
+
+                    if (addOns) {
+                        const addOnNames = addOns.split(',');
+                        const selected = (servData.addOnServices || []).filter(addOn =>
+                            addOnNames.includes(addOn.name)
+                        );
+                        setSelectedAddOns(selected);
+                    }
                 }
-            } catch (error) {
-                console.error("Error fetching service:", error);
-            }
-        };
-        fetchService();
-    }, [serviceId]);
 
-    // Process add-ons
-    useEffect(() => {
-        if (!service || !addOns) return;
+                // 2. Process Technicians
+                if (techSnap) {
+                    setTechnicians(techSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TechnicianInfo & { id: string })));
+                }
 
-        const addOnNames = addOns.split(',');
-        const selected = (service.addOnServices || []).filter(addOn =>
-            addOnNames.includes(addOn.name)
-        );
-        setSelectedAddOns(selected);
-    }, [service, addOns]);
-
-    // Fetch technicians
-    useEffect(() => {
-        const fetchTechnicians = async () => {
-            setLoading(true);
-            try {
-                const q = query(
-                    collection(db, 'technicians'),
-                    where('status', '==', 'available'),
-                    orderBy('firstName')
-                );
-                const querySnapshot = await getDocs(q);
-                setTechnicians(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TechnicianInfo & { id: string })));
-            } catch (e) {
-                console.error("Error fetching technicians:", e);
-            }
-            setLoading(false);
-        };
-        fetchTechnicians();
-    }, []);
-
-    // Fetch booking settings
-    useEffect(() => {
-        const fetchBookingSettings = async () => {
-            try {
-                const bookingSettingsDoc = await getDoc(doc(db, 'settings', 'booking'));
-                if (bookingSettingsDoc.exists()) {
-                    const settings = bookingSettingsDoc.data();
+                // 3. Process Booking Settings
+                if (settingsSnap && settingsSnap.exists()) {
+                    const settings = settingsSnap.data();
                     setTimeQueues(Array.isArray(settings.timeQueues) ? settings.timeQueues : []);
                     setTotalTechnicians(Number(settings.totalTechnicians ?? settings.totalBeauticians) || 1);
                     setUseTechnician(!!(settings.useTechnician ?? settings.useBeautician));
@@ -179,18 +171,36 @@ function SelectDateTimeContent() {
                     setHolidayDates(Array.isArray(settings.holidayDates) ? settings.holidayDates : []);
                     setBufferMinutes(Number(settings.bufferMinutes) || 0);
                 }
-            } catch (error) {
-                console.error("Error fetching booking settings:", error);
+
+                // 4. Process Appointments for Initial Day
+                if (apptSnap) {
+                    setAppointmentsForDay(apptSnap.docs.map(doc => doc.data()));
+                }
+            } catch (err) {
+                console.error("Error loading initial booking data:", err);
+            } finally {
+                if (isMounted) setLoading(false);
             }
         };
-        fetchBookingSettings();
-    }, []);
 
-    // Fetch appointments & Calculate availability
+        fetchInitialData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [serviceId, addOns]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Listen only to subsequent date changes to refresh appointments for that specific date
+    const [isInitialMount, setIsInitialMount] = useState(true);
     useEffect(() => {
+        if (isInitialMount) {
+            setIsInitialMount(false);
+            return;
+        }
         if (!date) return;
 
-        const fetchAppointments = async () => {
+        let isMounted = true;
+        const fetchAppointmentsForDate = async () => {
             const dateStr = format(date, 'yyyy-MM-dd');
             const q = query(
                 collection(db, 'appointments'),
@@ -200,16 +210,22 @@ function SelectDateTimeContent() {
 
             try {
                 const querySnapshot = await getDocs(q);
-                const appointments = querySnapshot.docs.map(doc => doc.data());
-                setAppointmentsForDay(appointments);
+                if (isMounted) {
+                    setAppointmentsForDay(querySnapshot.docs.map(doc => doc.data()));
+                }
             } catch (error) {
-                console.error("Error fetching appointments:", error);
-                setAppointmentsForDay([]);
+                console.error("Error fetching appointments for date:", error);
+                if (isMounted) setAppointmentsForDay([]);
             }
         };
 
-        fetchAppointments();
+        fetchAppointmentsForDate();
+
+        return () => {
+            isMounted = false;
+        };
     }, [date]);
+
 
     useEffect(() => {
         if (!appointmentsForDay) return;
@@ -322,7 +338,7 @@ function SelectDateTimeContent() {
         router.push(`/appointment/general-info?${params.toString()}`);
     };
 
-    const isDateOpen = (checkDate: Date) => {
+    const isDateOpen = useCallback((checkDate: Date) => {
         const dayOfWeek = checkDate.getDay();
         const daySchedule = weeklySchedule[dayOfWeek];
         const isRegularlyOpen = daySchedule ? daySchedule.isOpen : true;
@@ -333,7 +349,7 @@ function SelectDateTimeContent() {
         if (isHoliday) return false;
 
         return true;
-    };
+    }, [weeklySchedule, holidayDates]);
 
     const isTimeInBusinessHours = (timeSlot: string) => {
         if (!date) return true;
@@ -347,6 +363,52 @@ function SelectDateTimeContent() {
 
         return slotTime >= openTime && slotTime <= closeTime;
     };
+
+    // Memoize the 35-42 calendar days calculation to eliminate render lag on selection
+    const calendarDays = useMemo(() => {
+        const year = activeMonth.getFullYear();
+        const month = activeMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const totalDaysSpan = firstDay.getDay() + lastDay.getDate();
+        const totalCells = totalDaysSpan > 35 ? 42 : 35;
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+        const days = [];
+        const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 7, 0, 0);
+        const nowStart = new Date(new Date().setHours(0, 0, 0, 0));
+        const todayStr = (new Date()).toDateString();
+        const selectedDateStr = date ? date.toDateString() : '';
+
+        for (let i = 0; i < totalCells; i++) {
+            const d = new Date(currentDate);
+            const isCurrentMonth = d.getMonth() === month;
+            const isToday = todayStr === d.toDateString();
+            const isSelected = selectedDateStr === d.toDateString();
+            const isPast = d < nowStart;
+            const isBusinessOpen = isDateOpen(d);
+
+            const dateStr = format(d, 'yyyy-MM-dd');
+            const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
+            const isHoliday = !!holidayInfo;
+            const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth;
+
+            days.push({
+                index: i,
+                date: d,
+                dayNumber: d.getDate(),
+                isCurrentMonth,
+                isToday,
+                isSelected,
+                isHoliday,
+                isDisabled,
+            });
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        return days;
+    }, [activeMonth, date, isDateOpen, holidayDates]);
 
     return (
         <div className="min-h-screen bg-[#faf8f5]">
@@ -410,66 +472,35 @@ function SelectDateTimeContent() {
 
                         {/* Calendar days grid */}
                         <div className="grid grid-cols-7 gap-1">
-                            {(() => {
-                                const year = activeMonth.getFullYear();
-                                const month = activeMonth.getMonth();
-                                const firstDay = new Date(year, month, 1);
-                                const lastDay = new Date(year, month + 1, 0);
-                                const totalDaysSpan = firstDay.getDay() + lastDay.getDate();
-                                const totalCells = totalDaysSpan > 35 ? 42 : 35;
-                                const startDate = new Date(firstDay);
-                                startDate.setDate(startDate.getDate() - firstDay.getDay());
-
-                                const days = [];
-                                const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 7, 0, 0);
-
-                                for (let i = 0; i < totalCells; i++) {
-                                    const d = new Date(currentDate);
-                                    const isCurrentMonth = d.getMonth() === month;
-                                    const isToday = (new Date()).toDateString() === d.toDateString();
-                                    const isSelected = date && d.toDateString() === date.toDateString();
-                                    const isPast = d < new Date(new Date().setHours(0, 0, 0, 0));
-                                    const isBusinessOpen = isDateOpen(d);
-
-                                    const dateStr = format(d, 'yyyy-MM-dd');
-                                    const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
-                                    const isHoliday = !!holidayInfo;
-
-                                    const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth;
-
-                                    days.push(
-                                        <button
-                                            key={i}
-                                            onClick={() => !isDisabled && setDate(d)}
-                                            className={`h-8 sm:h-9 w-full flex items-center justify-center rounded-xl sm:rounded-2xl text-xs font-semibold transition-all relative ${
-                                                !isCurrentMonth ? 'opacity-0 pointer-events-none' : ''
-                                            } ${
-                                                isSelected
-                                                    ? 'bg-[#5d4037] text-white shadow-md shadow-[#5d4037]/25 scale-105 z-10'
-                                                    : isToday
-                                                        ? 'border-2 border-[#5d4037] text-[#5d4037] bg-[#5d4037]/5 font-bold'
-                                                        : isHoliday
-                                                            ? 'bg-rose-50 text-rose-500 border border-rose-100'
-                                                            : 'bg-transparent text-[#3e2723] hover:bg-[#faf8f5]'
-                                            } ${
-                                                isDisabled && isCurrentMonth ? 'opacity-30 cursor-not-allowed text-gray-400 hover:bg-transparent' : ''
-                                            }`}
-                                            disabled={isDisabled}
-                                        >
-                                            {d.getDate()}
-                                            {isHoliday && isCurrentMonth && (
-                                                <span className="absolute bottom-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
-                                            )}
-                                        </button>
-                                    );
-                                    currentDate.setDate(currentDate.getDate() + 1);
-                                }
-
-                                return days;
-                            })()}
+                            {calendarDays.map((cell) => (
+                                <button
+                                    key={cell.index}
+                                    onClick={() => !cell.isDisabled && setDate(cell.date)}
+                                    className={`h-8 sm:h-9 w-full flex items-center justify-center rounded-xl sm:rounded-2xl text-xs font-semibold transition-all relative ${
+                                        !cell.isCurrentMonth ? 'opacity-0 pointer-events-none' : ''
+                                    } ${
+                                        cell.isSelected
+                                            ? 'bg-[#5d4037] text-white shadow-md shadow-[#5d4037]/25 scale-105 z-10'
+                                            : cell.isToday
+                                                ? 'border-2 border-[#5d4037] text-[#5d4037] bg-[#5d4037]/5 font-bold'
+                                                : cell.isHoliday
+                                                    ? 'bg-rose-50 text-rose-500 border border-rose-100'
+                                                    : 'bg-transparent text-[#3e2723] hover:bg-[#faf8f5]'
+                                    } ${
+                                        cell.isDisabled && cell.isCurrentMonth ? 'opacity-30 cursor-not-allowed text-gray-400 hover:bg-transparent' : ''
+                                    }`}
+                                    disabled={cell.isDisabled}
+                                >
+                                    {cell.dayNumber}
+                                    {cell.isHoliday && cell.isCurrentMonth && (
+                                        <span className="absolute bottom-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
+
 
                 {/* Available Time Slots */}
                 <div className="w-full">

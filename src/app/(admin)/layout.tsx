@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, onAuthStateChanged } from '@/app/lib/supabaseAuth';
 import { doc, getDoc, collection, query, orderBy, onSnapshot, db, limit } from '@/app/lib/supabaseDb';
@@ -15,7 +15,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const router = useRouter();
     const { showToast, toasts, markAllAsRead: markAllToastsRead, clearAllToasts, registerAdminBell } = useToast();
@@ -109,7 +108,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     }, [router]);
 
     // Combine Firestore notifications and local toasts into a unified list
-    const combinedNotifications = (() => {
+    const combinedNotifications = useMemo(() => {
         const localItems: Notification[] = toasts.map(t => ({
             id: `toast-${t.id}`,
             title: t.type === 'error' ? 'แจ้งเตือนข้อผิดพลาด' : t.type === 'success' ? 'ดำเนินการสำเร็จ' : t.type === 'warning' ? 'แจ้งเตือน' : 'แจ้งเตือนระบบ',
@@ -129,9 +128,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt || 0).getTime();
             return timeB - timeA;
         });
-    })();
+    }, [toasts, notifications]);
 
-    const combinedUnreadCount = combinedNotifications.filter(n => !n.isRead).length;
+    const combinedUnreadCount = useMemo(() => {
+        return combinedNotifications.filter(n => !n.isRead).length;
+    }, [combinedNotifications]);
 
     const handleMarkAsRead = async () => {
         markAllToastsRead();

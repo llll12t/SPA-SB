@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db, collection, getDocs, query, orderBy, doc, deleteDoc, updateDoc } from '@/app/lib/supabaseDb';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -54,7 +54,6 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function ServicesListPage() {
     const [allServices, setAllServices] = useState<Service[]>([]);
-    const [filteredServices, setFilteredServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'unavailable'>('all');
@@ -72,7 +71,6 @@ export default function ServicesListPage() {
                 const snap = await getDocs(q);
                 const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
                 setAllServices(data);
-                setFilteredServices(data);
             } catch {
                 showToast('ไม่สามารถโหลดข้อมูลบริการได้', 'error');
             } finally {
@@ -82,7 +80,7 @@ export default function ServicesListPage() {
         fetchServices();
     }, [showToast]);
 
-    useEffect(() => {
+    const filteredServices = useMemo(() => {
         const lowerSearch = search.trim().toLowerCase();
         let res = allServices;
 
@@ -99,7 +97,7 @@ export default function ServicesListPage() {
             );
         }
 
-        setFilteredServices(res);
+        return res;
     }, [search, statusFilter, allServices]);
 
     const handleUpdateStatus = async (service: Service) => {

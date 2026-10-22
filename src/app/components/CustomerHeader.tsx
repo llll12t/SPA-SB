@@ -6,6 +6,10 @@ import { doc, onSnapshot, getDoc, db } from '@/app/lib/supabaseDb';
 import { useLiffContext } from '@/context/LiffProvider';
 import { useProfile } from '@/context/ProfileProvider';
 
+// Module-level caches to eliminate redundant network fetches across customer navigation steps
+let cachedPointSystemEnabled: boolean | null = null;
+const cachedCustomerPoints: Record<string, number> = {};
+
 interface CustomerHeaderProps {
     showBackButton?: boolean;
     showActionButtons?: boolean;
@@ -23,51 +27,79 @@ export default function CustomerHeader({
 }: CustomerHeaderProps) {
     const { profile, loading: liffLoading, error: liffError } = useLiffContext();
     const { profile: shopProfile } = useProfile();
-    const [customerData, setCustomerData] = useState<{ points?: number } | null>(null);
+    const initialPoints = profile?.userId ? cachedCustomerPoints[profile.userId] : undefined;
+    const [customerData, setCustomerData] = useState<{ points?: number } | null>(
+        initialPoints !== undefined ? { points: initialPoints } : null
+    );
     const [dbError, setDbError] = useState<string | null>(null);
-    const [enablePointSystem, setEnablePointSystem] = useState<boolean>(true);
+    const [enablePointSystem, setEnablePointSystem] = useState<boolean>(
+        cachedPointSystemEnabled ?? true
+    );
     const router = useRouter();
 
+    // Fetch points efficiently with caching (no heavy Realtime channel teardown on every page)
     useEffect(() => {
-        let unsubscribe = () => {};
-
-        if (!liffLoading && profile?.userId) {
-            const customerRef = doc(db, 'customers', profile.userId);
-            unsubscribe = onSnapshot(
-                customerRef,
-                (snapshot) => {
-                    if (snapshot.exists()) {
-                        setCustomerData(snapshot.data() as { points?: number });
+        let isMounted = true;
+        const userId = profile?.userId;
+        if (!liffLoading && userId) {
+            const fetchCustomerPoints = async () => {
+                try {
+                    const snap = await getDoc(doc(db, 'customers', userId));
+                    if (!isMounted) return;
+                    if (snap.exists()) {
+                        const pts = Number(snap.data()?.points ?? 0);
+                        cachedCustomerPoints[userId] = pts;
+                        setCustomerData({ points: pts });
                         setDbError(null);
                     } else {
+                        cachedCustomerPoints[userId] = 0;
                         setCustomerData({ points: 0 });
                     }
-                },
-                (error) => {
+                } catch (error) {
                     console.error('Customer fetch error:', error);
-                    setDbError('เชื่อมต่อข้อมูลไม่สำเร็จ');
+                    if (isMounted) setDbError('เชื่อมต่อข้อมูลไม่สำเร็จ');
                 }
-            );
+            };
+            fetchCustomerPoints();
         }
 
-        return () => unsubscribe();
+        return () => {
+            isMounted = false;
+        };
     }, [profile?.userId, liffLoading]);
 
+    // Fetch point settings once and cache in memory
     useEffect(() => {
+        let isMounted = true;
+        if (cachedPointSystemEnabled !== null) {
+            setEnablePointSystem(cachedPointSystemEnabled);
+            return;
+        }
+
         const fetchSettings = async () => {
             try {
                 const settingsRef = doc(db, 'settings', 'points');
                 const snap = await getDoc(settingsRef);
                 if (snap.exists()) {
                     const data = snap.data();
-                    setEnablePointSystem(data.enablePointSystem !== false);
+                    const enabled = data.enablePointSystem !== false;
+                    cachedPointSystemEnabled = enabled;
+                    if (isMounted) setEnablePointSystem(enabled);
+                } else {
+                    cachedPointSystemEnabled = true;
+                    if (isMounted) setEnablePointSystem(true);
                 }
             } catch (e) {
                 console.error('Error fetching point settings:', e);
             }
         };
         fetchSettings();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
+
 
     const headerShellClass = fixed
         ? 'fixed top-0 left-0 right-0 mx-auto w-full max-w-md bg-gradient-to-br from-[#5d4037] via-[#4a3429] to-[#3e2723] px-4.5 pb-3.5 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] text-white shadow-md z-40 rounded-b-3xl'

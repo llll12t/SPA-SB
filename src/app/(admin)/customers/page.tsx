@@ -328,6 +328,19 @@ export default function CustomersPage() {
         });
     }, [customers, search, filterKey]);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 16;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filterKey]);
+
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const paginatedCustomers = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filtered.slice(start, start + itemsPerPage);
+    }, [filtered, currentPage, itemsPerPage]);
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4 sm:space-y-5">
             {/* Confirmation & Form Modals */}
@@ -524,7 +537,7 @@ export default function CustomersPage() {
             ) : viewMode === 'grid' ? (
                 /* Grid View */
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-                    {filtered.map(customer => (
+                    {paginatedCustomers.map(customer => (
                         <div
                             key={customer.id}
                             className="group bg-white border border-[#e7e0da] hover:border-[#5d4037]/40 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
@@ -619,7 +632,7 @@ export default function CustomersPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#f0eae4]">
-                                {filtered.map(c => (
+                                {paginatedCustomers.map(c => (
                                     <tr key={c.id} className="hover:bg-[#fbf9f7] transition-colors">
                                         <td className="py-3 px-4">
                                             <div className="flex items-center gap-2.5">
@@ -681,6 +694,31 @@ export default function CustomersPage() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-3 pt-2 pb-1">
+                    <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="h-9 px-3.5 rounded-xl border border-[#d7ccc8] text-xs font-bold text-[#5d4037] bg-white hover:bg-[#f5f2ed] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                        ← ก่อนหน้า
+                    </button>
+                    <span className="text-xs font-semibold text-[#5d4037] tabular-nums">
+                        หน้า {currentPage} จาก {totalPages} (แสดง {paginatedCustomers.length} จาก {filtered.length} คน)
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-9 px-3.5 rounded-xl border border-[#d7ccc8] text-xs font-bold text-[#5d4037] bg-white hover:bg-[#f5f2ed] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                        ถัดไป →
+                    </button>
                 </div>
             )}
         </div>

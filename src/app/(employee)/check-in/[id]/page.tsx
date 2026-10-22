@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -42,14 +42,21 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
         action: (() => Promise<void>) | null;
     }>({ show: false, title: '', message: '', action: null });
 
+    const fetchedIdRef = useRef<string | null>(null);
+
     useEffect(() => {
+        if (!id) return;
+        if (fetchedIdRef.current === id && appointment) return;
+
+        let isMounted = true;
         const fetchAppointment = async () => {
-            if (!id) return;
             setLoading(true);
             try {
                 const lineAccessToken = liff?.getAccessToken?.();
                 const result = await findAppointmentById(id, { lineAccessToken });
+                if (!isMounted) return;
                 if (result.success && result.appointment) {
+                    fetchedIdRef.current = id;
                     setAppointment(result.appointment);
                 } else {
                     showToast('ไม่พบข้อมูลนัดหมาย', 'error');
@@ -57,15 +64,22 @@ export default function AppointmentManagementPage({ params }: { params: Promise<
                 }
             } catch (error) {
                 console.error("Error fetching appointment:", error);
-                showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
-                router.back();
+                if (isMounted) {
+                    showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
+                    router.back();
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         fetchAppointment();
-    }, [id, router, showToast, liff]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
     if (loading) {
         return (

@@ -94,12 +94,13 @@ export default function CreateAppointmentPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [bookingSettingsDoc] = await Promise.all([
-                    getDoc(doc(db, 'settings', 'booking'))
+                const [bookingSettingsDoc, servicesSnapshot, techniciansSnapshot] = await Promise.all([
+                    getDoc(doc(db, 'settings', 'booking')),
+                    getDocs(query(collection(db, 'services'), orderBy('serviceName'))),
+                    getDocs(query(collection(db, 'technicians'), where('status', '==', 'available'), orderBy('firstName')))
                 ]);
 
                 // Services
-                const servicesSnapshot = await getDocs(query(collection(db, 'services'), orderBy('serviceName')));
                 setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
 
                 // Settings
@@ -116,7 +117,6 @@ export default function CreateAppointmentPage() {
                 }
 
                 // Technicians
-                const techniciansSnapshot = await getDocs(query(collection(db, 'technicians'), where('status', '==', 'available'), orderBy('firstName')));
                 setTechnicians(techniciansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician)));
 
             } catch (error) {
